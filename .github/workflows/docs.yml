@@ -45,11 +45,12 @@ jobs:
       - name: Install dependencies
         run: |
           uv sync --all-groups
+          uv pip install ipython
 
       - name: Generate API documentation and Notebook
         run: |
           uv run sphinx-apidoc -f -e -M -o docs/api src/cantuccio
-          mkdir -p docs/examples docs/_extra/logos
+          mkdir -p docs/examples docs/_extra/logos docs/_static
           cp logos/cantuccio.png docs/_extra/logos/
           uv run marimo export ipynb examples/tutorial.py > docs/examples/tutorial.ipynb
 

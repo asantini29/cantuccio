@@ -8,7 +8,7 @@ Welcome to cantuccio's documentation!
    :maxdepth: 2
    :caption: Documentation:
 
-   api
+   api/modules
    license
 
 .. toctree::
