@@ -6,14 +6,16 @@
     <img src="https://img.shields.io/badge/Documentation-Online-blue.svg" alt="Documentation Status">
   </a>
   <br/>
-  <a href="https://badge.fury.io/py/cantuccio">
-    <img src="https://badge.fury.io/py/cantuccio.svg" alt="PyPI version">
+  <a href="https://pypi.org/project/cantuccio/">
+    <img src="https://img.shields.io/pypi/v/cantuccio?logo=pypi&label=PyPI" alt="PyPI version">
+  </a>
+  &nbsp;
+  <a href="https://github.com/asantini29/cantuccio/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="MIT License">
   </a>
     <br/>
 <br clear="left"/>
 </p>
-
-
 
 > **can·tuc·cio** | /kan'tutːʃo/ 
 > *noun* [masculine]
