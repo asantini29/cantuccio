@@ -2,7 +2,7 @@
 
 <p>
   <img src="logos/cantuccio.png" alt="Cantuccio Logo" width="100" align="left" style="margin-right: 15px;" />
-  <a href="docs/index.html">
+  <a href="https://asantini29.github.io/cantuccio/">
     <img src="https://img.shields.io/badge/Documentation-Online-blue.svg" alt="Documentation Status">
   </a>
   <br/>

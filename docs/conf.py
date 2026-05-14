@@ -1,9 +1,8 @@
 import os
 import sys
 
-import cantuccio
-
 sys.path.insert(0, os.path.abspath("../src"))
+import cantuccio
 
 project = "cantuccio"
 
