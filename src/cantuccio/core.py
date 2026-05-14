@@ -175,7 +175,6 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
     offdiag_kwargs: Optional[dict] = None,
     truth_kwargs: Optional[dict] = None,
     legend_kwargs: Optional[dict] = None,
-    fast_kde: bool = True,
     n_ticks: int = 4,
     xlabelpad: float | None = 4.0,
     ylabelpad: float | None = 2.0,
@@ -230,8 +229,6 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         Keyword arguments for the truth lines.
     legend_kwargs : dict, optional
         Keyword arguments for the legend.
-    fast_kde : bool, default True
-        If True, use the `JAX`-based KDE estimation of :mod:`KDExpress`. If False, use the :mod:`scipy` gaussian KDE estimation.
     n_ticks : int, default 4
         Number of ticks to show on each axis.
     xlabelpad : float, optional
@@ -375,7 +372,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                 data = chain_here[columns[i]]
                 w = _weights[c_idx]
 
-                x, pdf = kde_1d(data, bw=kde_bw, fast=fast_kde, weights=w)
+                x, pdf = kde_1d(data, bw=kde_bw, weights=w)
                 lo, med, hi = get_credible_interval(data, credible_interval, weights=w)
 
                 ax.plot(x, pdf, **{"color": color, **kde_kwargs})
@@ -431,7 +428,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
 
                     if _use_kde:
                         x_out, y_out, z_out = kde_2d(
-                            xd, yd, bw=kde_bw, fast=fast_kde, weights=w
+                            xd, yd, bw=kde_bw, weights=w
                         )
                         lvls = hdi_levels(z_out, contour_levels)
 
