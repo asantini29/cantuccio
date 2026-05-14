@@ -38,7 +38,7 @@ def test_cornerplot_execution_without_weights():
         "y": np.random.randn(100),
     }
     # Test that it executes without raising an exception
-    fig, axes = cornerplot(samples, fast_kde=False)
+    fig, axes = cornerplot(samples)
     assert fig is not None
     assert axes.shape == (2, 2)
 
@@ -51,7 +51,7 @@ def test_cornerplot_execution_with_weights():
     weights = np.random.uniform(0.1, 1.0, 100)
     
     # Test that it executes without raising an exception
-    fig, axes = cornerplot(samples, weights=weights, fast_kde=False)
+    fig, axes = cornerplot(samples, weights=weights)
     assert fig is not None
     assert axes.shape == (2, 2)
 
@@ -68,6 +68,6 @@ def test_cornerplot_multiple_chains_with_weights():
     w1 = np.ones(100)
     w2 = np.ones(100) * 0.5
     
-    fig, axes = cornerplot([chain1, chain2], weights=[w1, w2], fast_kde=False)
+    fig, axes = cornerplot([chain1, chain2], weights=[w1, w2])
     assert fig is not None
     assert axes.shape == (2, 2)
