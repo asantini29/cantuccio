@@ -1,0 +1,4 @@
+_build/
+_extra/
+examples/*.ipynb
+api/

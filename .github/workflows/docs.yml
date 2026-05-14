@@ -1,0 +1,86 @@
+name: Documentation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Allow manual triggering
+  workflow_dispatch:
+
+# Set permissions for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+
+      - name: Install dependencies
+        run: |
+          uv sync --all-groups
+
+      - name: Generate API documentation and Notebook
+        run: |
+          uv run sphinx-apidoc -f -e -M -o docs/api src/cantuccio
+          mkdir -p docs/examples docs/_extra/logos
+          cp logos/cantuccio.png docs/_extra/logos/
+          uv run marimo export ipynb examples/tutorial.py > docs/examples/tutorial.ipynb
+
+      - name: Build documentation
+        env:
+          JAX_PLATFORM_NAME: cpu
+          CUDA_VISIBLE_DEVICES: ""
+        run: |
+            uv run sphinx-build -W -b html docs docs/_build/html
+        # uv run sphinx-build -b html docs docs/_build/html --keep-going
+        # -W treats warnings as errors
+        # --keep-going continues despite errors to see all issues
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_build/html
+
+  # Deployment job
+  deploy:
+    # Only deploy on push to main, not on PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

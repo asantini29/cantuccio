@@ -63,4 +63,4 @@ fig.show()
 This project made use of generative AI. All the outputs have been reviewed and edited to ensure quality and consistency.
 
 ## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/asantini29/cantuccio/blob/main/LICENSE) file for details.

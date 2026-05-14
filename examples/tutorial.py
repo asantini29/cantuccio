@@ -60,7 +60,7 @@ def _(mo):
 
 @app.cell
 def _(cornerplot, first_chain, plt):
-    cornerplot(samples=first_chain)
+    _ = cornerplot(samples=first_chain)
     plt.show()
     return
 
@@ -83,7 +83,7 @@ def _(mo):
 
 @app.cell
 def _(cornerplot, first_chain, plt, styles):
-    cornerplot(samples=first_chain, offdiag_mode=styles.value)
+    _ =cornerplot(samples=first_chain, offdiag_mode=styles.value)
     plt.show()
     return
 
@@ -103,8 +103,9 @@ def _(first_chain, mus):
 
 
 @app.cell
-def _(cornerplot, first_chain, truths):
-    cornerplot(samples=first_chain, truths=truths)
+def _(cornerplot, first_chain, plt, truths):
+    _ = cornerplot(samples=first_chain, truths=truths)
+    plt.show()
     return
 
 
@@ -117,8 +118,9 @@ def _(mo):
 
 
 @app.cell
-def _(cornerplot, first_chain, truths):
-    cornerplot(samples=first_chain, truths=truths, plot_delta=True)
+def _(cornerplot, first_chain, plt, truths):
+    _ = cornerplot(samples=first_chain, truths=truths, plot_delta=True)
+    plt.show()
     return
 
 
@@ -137,8 +139,9 @@ def _(get_samples, mus):
 
 
 @app.cell
-def _(cornerplot, first_chain, second_chain, truths):
-    cornerplot(samples=[first_chain, second_chain], truths=truths)
+def _(cornerplot, first_chain, plt, second_chain, truths):
+    _ = cornerplot(samples=[first_chain, second_chain], truths=truths)
+    plt.show()
     return
 
 
@@ -151,8 +154,9 @@ def _(mo):
 
 
 @app.cell
-def _(cornerplot, first_chain, second_chain, truths):
-    cornerplot(samples=[first_chain, second_chain], truths=truths, chain_labels=['first chain', 'second chain'])
+def _(cornerplot, first_chain, plt, second_chain, truths):
+    _ = cornerplot(samples=[first_chain, second_chain], truths=truths, chain_labels=['first chain', 'second chain'])
+    plt.show()
     return
 
 
@@ -165,8 +169,9 @@ def _(mo):
 
 
 @app.cell
-def _(cornerplot, first_chain, second_chain, truths):
-    cornerplot(samples=[first_chain, second_chain], truths=truths, chain_labels=['first chain', 'second chain'], n_ticks=3)
+def _(cornerplot, first_chain, plt, second_chain, truths):
+    _ = cornerplot(samples=[first_chain, second_chain], truths=truths, chain_labels=['first chain', 'second chain'], n_ticks=3)
+    plt.show()
     return
 
 
