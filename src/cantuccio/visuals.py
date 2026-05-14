@@ -35,6 +35,7 @@ DIVERGING_COLORLIST = [
 
 DEFAULT_STYLEFILE = "corner.mplstyle"
 
+
 def chain_cmap(color: str) -> LinearSegmentedColormap:
     """
     Linear colormap from fully transparent to ``color``; good for hist2d/hexbin.
@@ -51,6 +52,7 @@ def chain_cmap(color: str) -> LinearSegmentedColormap:
     """
     r, g, b, _ = to_rgba(color)
     return LinearSegmentedColormap.from_list("_cc", [(r, g, b, 0.0), (r, g, b, 1.0)])
+
 
 def get_stylefile(filename: Optional[str] = None) -> str:
     """
@@ -71,8 +73,11 @@ def get_stylefile(filename: Optional[str] = None) -> str:
 
     filepath = os.path.join(os.path.dirname(__file__), "mplfiles", filename)
     if not os.path.isfile(filepath):
-        raise FileNotFoundError(f"Style file '{filename}' not found in 'mplfiles' directory. Absolute path searched: {filepath}")
+        raise FileNotFoundError(
+            f"Style file '{filename}' not found in 'mplfiles' directory. Absolute path searched: {filepath}"
+        )
     return filepath
+
 
 def legend_bbox(num_dim: int) -> tuple[float, float]:
     """Return (x, y) in figure-relative coordinates for the corner-plot legend.

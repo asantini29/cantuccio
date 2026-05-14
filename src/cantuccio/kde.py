@@ -69,7 +69,9 @@ def _kde2d_fast(
     data_2d = jnp.stack([jnp.asarray(x), jnp.asarray(y)], axis=-1)
     _bw = None if isinstance(bw, str) else bw
     _w = jnp.asarray(weights) if weights is not None else jnp.ones(data_2d.shape[0])
-    z_out = _fft_kde2d(xi, yi, data_2d, weights=_w, bw=_bw)  # shape (n_x, n_y), ij-indexed
+    z_out = _fft_kde2d(
+        xi, yi, data_2d, weights=_w, bw=_bw
+    )  # shape (n_x, n_y), ij-indexed
     x_out, y_out = np.meshgrid(np.array(xi), np.array(yi))
     return x_out, y_out, np.array(z_out).T  # .T: ij → xy for matplotlib
 

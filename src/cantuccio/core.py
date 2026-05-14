@@ -21,7 +21,13 @@ from matplotlib.figure import Figure
 import numpy as np
 
 from .kde import hdi_levels, kde_1d, kde_2d
-from .visuals import DEFAULT_COLORLIST, chain_cmap, get_stylefile, reposition_legend, scale_font
+from .visuals import (
+    DEFAULT_COLORLIST,
+    chain_cmap,
+    get_stylefile,
+    reposition_legend,
+    scale_font,
+)
 
 OFFDIAG_MODES = {
     "hist",
@@ -32,6 +38,7 @@ OFFDIAG_MODES = {
     "hexbin+kde",
     "contour+kde",
 }
+
 
 def _hist_fn(ax, x, y, weights, cmap, **kwargs):
     ax.hist2d(
@@ -51,15 +58,17 @@ def _hexbin_fn(ax, x, y, weights, cmap, **kwargs):
         **{"gridsize": 15, "mincnt": 1, "cmap": cmap, "lw": 0.0, **kwargs},
     )
 
+
 def _pass_fn(*args, **kwargs):
     pass
+
 
 def get_credible_interval(
     data: np.ndarray, level: float, weights: np.ndarray | None = None
 ) -> tuple[float, float, float]:
     """
     Return (lower, median, upper) for a highest-density credible interval.
-    
+
     Parameters
     ----------
     data : np.ndarray
@@ -68,7 +77,7 @@ def get_credible_interval(
         Credible interval level, e.g. 0.90 for a 90% credible interval.
     weights : np.ndarray, optional
         1D array of weights corresponding to the samples.
-    
+
     Returns
     -------
     tuple[float, float, float]
@@ -85,6 +94,7 @@ def get_credible_interval(
     cdf = np.cumsum(w) - 0.5 * w
     cdf /= np.sum(w)
     return tuple(np.interp(np.array(percentiles) / 100.0, cdf, d))
+
 
 def overplot_lines(
     axes: np.ndarray,
@@ -147,7 +157,7 @@ def overplot_lines(
                 y_here = False
 
 
-def cornerplot( #pylint: disable=too-many-branches, too-many-statements too-many-arguments too-many-positional-arguments too-many-locals
+def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-many-arguments too-many-positional-arguments too-many-locals
     samples: dict[str, np.ndarray] | list[dict[str, np.ndarray]],
     columns: list[str] | None = None,
     weights: np.ndarray | list[np.ndarray] | None = None,
@@ -346,7 +356,7 @@ def cornerplot( #pylint: disable=too-many-branches, too-many-statements too-many
 
         # ── figure / axes / fontsizes ──────────────────────────────────────────
         if fig is None or axes is None:
-            figsize = (2. * n_dim, 2. * n_dim)
+            figsize = (2.0 * n_dim, 2.0 * n_dim)
             fig, axes = plt.subplots(n_dim, n_dim, figsize=figsize, squeeze=False)
 
         label_fontsize = scale_font(plt.rcParams["axes.labelsize"], n_dim)
@@ -420,7 +430,9 @@ def cornerplot( #pylint: disable=too-many-branches, too-many-statements too-many
                     offdiag_hist_fn(ax, xd, yd, w, cmap, **offdiag_kwargs)
 
                     if _use_kde:
-                        x_out, y_out, z_out = kde_2d(xd, yd, bw=kde_bw, fast=fast_kde, weights=w)
+                        x_out, y_out, z_out = kde_2d(
+                            xd, yd, bw=kde_bw, fast=fast_kde, weights=w
+                        )
                         lvls = hdi_levels(z_out, contour_levels)
 
                         if base_mode == "contour":
