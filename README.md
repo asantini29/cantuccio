@@ -6,10 +6,6 @@
     <img src="https://img.shields.io/badge/Documentation-Online-blue.svg" alt="Documentation Status">
   </a>
   <br/>
-  <a href="https://travis-ci.org/cantuccio/cantuccio">
-    <img src="https://travis-ci.org/cantuccio/cantuccio.svg?branch=main" alt="Build Status">
-  </a>
-  <br/>
   <a href="https://badge.fury.io/py/cantuccio">
     <img src="https://badge.fury.io/py/cantuccio.svg" alt="PyPI version">
   </a>
