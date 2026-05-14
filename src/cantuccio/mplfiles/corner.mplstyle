@@ -1,0 +1,78 @@
+### Baseline style for corner plots.
+#
+
+# ---------------------------------------------------------------------------
+# Text / LaTeX
+# ---------------------------------------------------------------------------
+text.usetex: True
+text.latex.preamble: \usepackage{amsmath}\usepackage{amssymb}
+font.family: serif
+font.serif: Computer Modern
+font.monospace : Computer Modern Typewriter
+
+# Base font size — the scale factor multiplies these directly.
+font.size:                  18
+
+# ---------------------------------------------------------------------------
+# Axes
+# ---------------------------------------------------------------------------
+axes.labelsize:             18      # parameter labels on x/y
+axes.titlesize:             18      # 1-D histogram titles (medians, quantiles)
+axes.linewidth:             0.8
+
+axes.formatter.use_mathtext: True
+axes.formatter.limits:      -3, 4
+
+# ---------------------------------------------------------------------------
+# Ticks
+# ---------------------------------------------------------------------------
+xtick.top:              True
+xtick.direction:        in
+xtick.major.size:       4.5
+xtick.minor.size:       3
+xtick.major.width:      0.8
+xtick.minor.width:      0.4
+xtick.minor.visible:    False
+xtick.labelsize:        14
+
+ytick.right:            True
+ytick.direction:        in
+ytick.major.size:       4.5
+ytick.minor.size:       3
+ytick.major.width:      0.8
+ytick.minor.width:      0.4
+ytick.minor.visible:    False
+ytick.labelsize:        14
+
+# ---------------------------------------------------------------------------
+# Lines / patches (contours, histograms)
+# ---------------------------------------------------------------------------
+lines.linewidth:        1.5
+patch.linewidth:        1.0
+
+# ---------------------------------------------------------------------------
+# Grid
+# ---------------------------------------------------------------------------
+axes.grid:              True
+grid.alpha:             0.6
+grid.linestyle:         :
+
+
+
+# ---------------------------------------------------------------------------
+# Legend
+# ---------------------------------------------------------------------------
+legend.fontsize:        16
+legend.frameon:         True
+legend.fancybox:        True
+legend.handlelength:    1.5
+legend.handletextpad:   0.4
+legend.labelspacing:    0.4
+legend.borderaxespad:   0.0
+
+# ---------------------------------------------------------------------------
+# Save
+# ---------------------------------------------------------------------------
+savefig.dpi:    300
+savefig.format: pdf
+savefig.bbox:   tight

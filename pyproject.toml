@@ -1,0 +1,24 @@
+[project]
+name = "cantuccio"
+version = "0.1.0"
+description = "The sweetest corner plot package around."
+author = "Alessandro Santini"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "black>=26.3.1",
+    "isort>=8.0.1",
+    "jax>=0.8.3",
+    "kdexpress>=1.0.1",
+    "matplotlib>=3.10.9",
+    "mypy>=2.0.0",
+    "scipy>=1.17.1",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
+docs = [
+    "marimo>=0.23.5",
+]
