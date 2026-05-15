@@ -281,7 +281,13 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
             )
 
         _truths = truths.copy() if truths is not None else {}
-        all_columns = list(samples[0].keys())
+        seen = set()
+        all_columns = []
+        for chain in samples:
+            for k in chain.keys():
+                if k not in seen:
+                    seen.add(k)
+                    all_columns.append(k)
 
         if columns is None:
             columns = all_columns
@@ -303,7 +309,8 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
             for chain in samples:
                 tmp_chain = {}
                 for old_key, new_key in zip(columns, new_columns):
-                    tmp_chain[new_key] = chain[old_key] - _truths[old_key]
+                    if old_key in chain:
+                        tmp_chain[new_key] = chain[old_key] - _truths[old_key]
                 _chains.append(tmp_chain)
             columns = new_columns
             truths = {key: 0.0 for key in columns}
@@ -311,8 +318,8 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
             for chain in samples:
                 tmp_chain = {}
                 for key in columns:
-                    tmp_chain[key] = chain[key]
-
+                    if key in chain:
+                        tmp_chain[key] = chain[key]
                 _chains.append(tmp_chain)
 
         # ── defaults ──────────────────────────────────────────────────────────────
@@ -369,7 +376,9 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
             ax = axes[i, i]
             for c_idx, (chain_here, color) in enumerate(zip(_chains, colors)):
 
-                data = chain_here[columns[i]]
+                data = chain_here.get(columns[i])
+                if data is None:
+                    continue
                 w = _weights[c_idx]
 
                 x, pdf = kde_1d(data, bw=kde_bw, weights=w)
@@ -420,7 +429,10 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                 ax = axes[i, j]
 
                 for c_idx, (chain_here, color) in enumerate(zip(_chains, colors)):
-                    xd, yd = chain_here[columns[j]], chain_here[columns[i]]
+                    xd = chain_here.get(columns[j])
+                    yd = chain_here.get(columns[i])
+                    if xd is None or yd is None:
+                        continue
                     w = _weights[c_idx]
                     cmap = chain_cmap(color)
 

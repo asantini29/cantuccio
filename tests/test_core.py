@@ -71,3 +71,18 @@ def test_cornerplot_multiple_chains_with_weights():
     fig, axes = cornerplot([chain1, chain2], weights=[w1, w2])
     assert fig is not None
     assert axes.shape == (2, 2)
+
+def test_cornerplot_multiple_chains_not_full():
+    chain1 = {
+        "x": np.random.randn(100),
+        "y": np.random.randn(100),
+        "z": np.random.randn(100),
+    }
+    chain2 = {
+        "x": np.random.randn(100),
+        "y": np.random.randn(100),
+    }
+    
+    fig, axes = cornerplot([chain1, chain2])
+    assert fig is not None
+    assert axes.shape == (3, 3)
