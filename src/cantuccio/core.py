@@ -540,7 +540,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                 "frameon": False,
                 "fancybox": True,
                 "title_fontsize": label_fontsize,
-                "ncol": round(len(handles) / max_handles_per_column),
+                "ncol": int(np.ceil(len(handles) / max_handles_per_column)),
             }
 
             _legend_kwargs.update(legend_kwargs or {})

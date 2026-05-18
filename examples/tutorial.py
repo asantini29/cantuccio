@@ -1,6 +1,6 @@
 import marimo
 
-__generated_with = "0.23.5"
+__generated_with = "0.23.6"
 app = marimo.App(width="medium")
 
 
@@ -172,6 +172,34 @@ def _(mo):
 def _(cornerplot, first_chain, plt, second_chain, truths):
     _ = cornerplot(samples=[first_chain, second_chain], truths=truths, chain_labels=['first chain', 'second chain'], n_ticks=3)
     plt.show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Chains do not have to share the same parameters, but we can still plot them together
+    """)
+    return
+
+
+@app.cell
+def _(cornerplot, first_chain, plt, second_chain, truths):
+    _second_chain = second_chain.copy()
+    _second_chain[r"$\mu_4$"] = _second_chain[r"$\mu_1$"]
+
+    _second_chain.pop(r"$\mu_1$")
+
+    _truths = truths.copy()
+    _truths[r"$\mu_4$"] = truths[r"$\mu_1$"]
+
+    _ = cornerplot(samples=[first_chain, _second_chain], truths=_truths, chain_labels=['first chain', 'second chain'], n_ticks=3)
+    plt.show()
+    return
+
+
+@app.cell
+def _():
     return
 
 
