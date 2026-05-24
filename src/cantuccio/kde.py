@@ -12,6 +12,7 @@ from typing import Sequence
 import numpy as np
 from scipy.stats import gaussian_kde
 
+
 def hdi_levels(z_out: np.ndarray, levels: Sequence[float]) -> list[float]:
     """
     Density thresholds for Highest Density contours.

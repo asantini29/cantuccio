@@ -7,11 +7,11 @@ This module contains some plotting utility functions for :mod:`cantuccio` corner
 
 from __future__ import annotations
 
+import os
+from typing import Optional
+
 from matplotlib.colors import LinearSegmentedColormap, to_rgba
 from matplotlib.figure import Figure
-
-from typing import Optional
-import os
 
 pt = 1.0 / 72.27
 golden_ratio = (1.0 + 5.0**0.5) / 2.0
@@ -48,8 +48,8 @@ SEQUENTIAL_COLORLIST_v2 = [
     "#1D436D",
     "#3E6D99",
     "#0A85B8",
-    "#06CFC2", 
-    "#04E8C8"
+    "#06CFC2",
+    "#04E8C8",
 ]
 
 DIVERGING_COLORLIST = [

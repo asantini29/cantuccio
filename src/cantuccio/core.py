@@ -13,21 +13,15 @@ import os
 import warnings
 from typing import Optional
 
+import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import ticker
 from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 
-import numpy as np
-
 from .kde import hdi_levels, kde_1d, kde_2d
-from .visuals import (
-    DEFAULT_COLORLIST,
-    chain_cmap,
-    get_stylefile,
-    reposition_legend,
-    scale_font,
-)
+from .visuals import (DEFAULT_COLORLIST, chain_cmap, get_stylefile,
+                      reposition_legend, scale_font)
 
 OFFDIAG_MODES = {
     "hist",
@@ -439,9 +433,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                     offdiag_hist_fn(ax, xd, yd, w, cmap, **offdiag_kwargs)
 
                     if _use_kde:
-                        x_out, y_out, z_out = kde_2d(
-                            xd, yd, bw=kde_bw, weights=w
-                        )
+                        x_out, y_out, z_out = kde_2d(xd, yd, bw=kde_bw, weights=w)
                         lvls = hdi_levels(z_out, contour_levels)
 
                         if base_mode == "contour":
