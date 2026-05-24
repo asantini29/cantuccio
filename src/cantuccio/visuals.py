@@ -13,7 +13,26 @@ from matplotlib.figure import Figure
 from typing import Optional
 import os
 
+pt = 1.0 / 72.27
+golden_ratio = (1.0 + 5.0**0.5) / 2.0
+
+journal_sizes = {
+    "prd": {"onecol": 246.0 * pt, "twocol": 510.0 * pt},
+    "cqg": {"onecol": 374.0 * pt},  # CQG is only one column
+}
+
 DEFAULT_COLORLIST = ["#5790fc", "#f89c20", "#e42536", "#964a8b", "#9c9ca1", "#7a21dd"]
+
+CATEGORICAL_COLORLIST = [
+    "#1B6BBF",
+    "#E8832A",
+    "#7B3FA0",
+    "#2A9E8F",
+    "#C94040",
+    "#F0B429",
+    "#5AAADE",
+    "#A0522D",
+]
 
 SEQUENTIAL_COLORLIST = [
     "#033270",  # deep navy
@@ -24,6 +43,15 @@ SEQUENTIAL_COLORLIST = [
     "#04E8C8",  # turquoise
 ]
 
+SEQUENTIAL_COLORLIST_v2 = [
+    "#0B2038",
+    "#1D436D",
+    "#3E6D99",
+    "#0A85B8",
+    "#06CFC2", 
+    "#04E8C8"
+]
+
 DIVERGING_COLORLIST = [
     "#033270",  # deep navy          ← pole
     "#0A85B8",  # medium blue
@@ -32,6 +60,16 @@ DIVERGING_COLORLIST = [
     "#06CFC2",  # teal
     "#04E8C8",  # vivid turquoise    ← pole
 ]
+
+DIVERGING_COLORLIST_v2 = [
+    "#0B2038",  # deep navy          ← pole
+    "#0A85B8",  # medium blue
+    "#A8D8EA",  # pale sky            near-centre
+    "#A8EDE6",  # pale mint           near-centre
+    "#06CFC2",  # teal
+    "#04E8C8",  # vivid turquoise    ← pole
+]
+
 
 DEFAULT_STYLEFILE = "corner.mplstyle"
 
@@ -77,6 +115,41 @@ def get_stylefile(filename: Optional[str] = None) -> str:
             f"Style file '{filename}' not found in 'mplfiles' directory. Absolute path searched: {filepath}"
         )
     return filepath
+
+
+def get_paper_style(
+    journal: str = "prd", cols: str = "onecol", aspect: float = golden_ratio
+) -> list[str | dict]:
+    """
+    Get a style list for use with plt.style.context().
+
+    Parameters
+    ----------
+    journal : str
+        Journal name, must be a key in `journal_sizes`.
+    cols : str
+        Column key, e.g. 'onecol' or 'twocol'.
+    aspect : float
+        Height = width / aspect. Defaults to the golden ratio.
+
+    Returns
+    -------
+    list[str | dict]
+        Two-element list: [style_file_or_name, {"figure.figsize": (width, height)}].
+    """
+    # check that journal and cols are valid keys
+    if journal not in journal_sizes:
+        raise ValueError(
+            f"Journal '{journal}' not found. Valid options: {list(journal_sizes.keys())}"
+        )
+    if cols not in journal_sizes[journal]:
+        raise ValueError(
+            f"Column option '{cols}' not found for journal '{journal}'. Valid options: {list(journal_sizes[journal].keys())}"
+        )
+
+    style = get_stylefile("paper.mplstyle")
+    width = journal_sizes[journal][cols]
+    return [style, {"figure.figsize": (width, width / aspect)}]
 
 
 def legend_bbox(num_dim: int) -> tuple[float, float]:
