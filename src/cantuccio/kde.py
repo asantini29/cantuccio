@@ -12,7 +12,7 @@ from typing import Sequence
 import numpy as np
 from scipy.stats import gaussian_kde
 from KDEpy import FFTKDE
-
+PAD_VALUE = 0.05
 
 def hdi_levels(z_out: np.ndarray, levels: Sequence[float]) -> list[float]:
     """
@@ -71,7 +71,7 @@ def _scipy_kde_1d(
     """
     kde = gaussian_kde(data, bw_method=bw, weights=weights)
     span = data.max() - data.min() or 1.0
-    pad = 0.15 * span
+    pad = PAD_VALUE * span
     x = np.linspace(data.min() - pad, data.max() + pad, n)
     return x, kde(x)
 
@@ -110,8 +110,8 @@ def _scipy_kde_2d(
         2D array of probability density values.
     """
     kde = gaussian_kde(np.vstack([x, y]), bw_method=bw, weights=weights)
-    px = 0.10 * (x.max() - x.min() or 1.0)
-    py = 0.10 * (y.max() - y.min() or 1.0)
+    px = PAD_VALUE * (x.max() - x.min() or 1.0)
+    py = PAD_VALUE * (y.max() - y.min() or 1.0)
     xi = np.linspace(x.min() - px, x.max() + px, n)
     yi = np.linspace(y.min() - py, y.max() + py, n)
     x_out, y_out = np.meshgrid(xi, yi)
@@ -150,7 +150,7 @@ def _fft_kde_1d(
     kde = FFTKDE(bw=absolute_bw)
     
     span = data.max() - data.min() or 1.0
-    pad = 0.15 * span
+    pad = PAD_VALUE * span
     x = np.linspace(data.min() - pad, data.max() + pad, n)
     pdf = kde.fit(data, weights=weights).evaluate(x)
     return x, pdf

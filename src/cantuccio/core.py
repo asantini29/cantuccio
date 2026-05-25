@@ -423,6 +423,10 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
             ax.tick_params(
                 axis="y", direction=plt.rcParams["xtick.direction"]
             )  # use the style context
+            
+            # Lock the bottom of the y-axis exactly to 0 so the KDE rests on the floor
+            ax.set_ylim(bottom=0.0)
+            
             if i < n_dim - 1:
                 ax.set_xticklabels([])
             else:
