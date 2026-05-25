@@ -242,7 +242,7 @@ def kde_1d(
     n : int, optional
         Number of points to evaluate the KDE on. Default is 512.
     fast : bool, optional
-        Use FFT-based KDE (KDExpress). Default is False.
+        Use FFT-based KDE (KDEpy.FFTKDE). Default is False.
 
     Returns
     -------
@@ -279,7 +279,7 @@ def kde_2d(
     n : int, optional
         Number of points to evaluate the KDE on. Default is 80.
     fast : bool, optional
-        Use FFT-based KDE (KDExpress). Default is False.
+        Use FFT-based KDE (KDEpy.FFTKDE). Default is False.
 
     Returns
     -------
