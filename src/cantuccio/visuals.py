@@ -174,9 +174,11 @@ def legend_bbox(num_dim: int) -> tuple[float, float]:
     target_row = min(2, max(0, num_dim // 2))
 
     # make sure not to exceed the top and right edges of the figure, even for small num_dim
-    x_max = 0.75
+    # We use a tighter x-offset multiplier since the legend is now anchored at 'upper left'
+    # instead of 'upper center'. This prevents the legend from being pushed too far right.
+    x_max = 0.60
     y_min = 0.87
-    x = min((target_row + 1.3) * cell, x_max)
+    x = min((target_row + 1.1) * cell, x_max)
 
     y = y_min + 0.02 * num_dim**0.5
     return (x, y)

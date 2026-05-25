@@ -20,8 +20,13 @@ from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
 
 from .kde import hdi_levels, kde_1d, kde_2d
-from .visuals import (DEFAULT_COLORLIST, chain_cmap, get_stylefile,
-                      reposition_legend, scale_font)
+from .visuals import (
+    DEFAULT_COLORLIST,
+    chain_cmap,
+    get_stylefile,
+    reposition_legend,
+    scale_font,
+)
 
 OFFDIAG_MODES = {
     "hist",
@@ -158,7 +163,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
     truths: Optional[dict] = None,
     plot_delta: bool = False,
     credible_interval: float = 0.90,
-    chain_labels: Optional[str | list[str]] = None,
+    labels: Optional[str | list[str]] = None,
     colors: Optional[list[str]] = None,
     contour_levels: tuple[float, ...] = (0.68, 0.90),
     title_format: Optional[str] = None,
@@ -194,7 +199,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         If True, plot the difference between the samples and the truths (i.e., Δ = samples - truths) instead of the raw samples. Requires `truths` to be provided.
     credible_interval : float, default 0.90
         Credible interval level for shading the 1D KDE plots on the diagonal.
-    chain_labels : str or list[str], optional
+    labels : str or list[str], optional
         Label(s) for the chain(s) to be used in the legend. If a single string is provided and multiple chains are given, the same label will be used for all chains.
     colors : list[str], optional
         List of colors for the chains. If not provided, default colors will be used.
@@ -216,7 +221,11 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         - "hexbin+kde": Hexagonal binning with KDE contours overlaid
         - "contour+kde": Filled contour plot with KDE contours overlaid
     kde_kwargs : dict, optional
-        Keyword arguments for the KDE estimation.
+        Keyword arguments for the KDE estimation. If not provided, defaults will be used (e.g., bandwidth method "silverman" and FFT-based KDE). Supported keys include:
+        - "bandwidth": Bandwidth method for KDE ("scott", "silverman", or a scalar factor).
+        - "fast": If True, use FFT-based KDE through the `KDEpy` package for faster computation on large datasets. If False, use the standard `scipy.stats.gaussian_kde`. Default is False.
+        - "num_1d": Number of points to evaluate the 1D KDE on. Default is 512.
+        - "num_2d": Number of points per dimension to evaluate the 2D KDE on. Default is 80.
     offdiag_kwargs : dict, optional
         Keyword arguments for the off-diagonal plots (histogram, hexbin, contour).
     truth_kwargs : dict, optional
@@ -245,6 +254,8 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         stylefile = get_stylefile()
 
     with plt.style.context(stylefile):
+        
+        chain_labels = labels # give a more descriptive name
 
         if not isinstance(samples, list):
             samples = [samples]
@@ -261,9 +272,12 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
             )
         _weights = weights if weights is not None else [None] * num_chains
 
-        if colors is not None and len(colors) != num_chains:
-            raise ValueError("Number of colors does not match the number of chains")
-        if colors is None:
+        if colors is not None:
+            if isinstance(colors, str):
+                colors = [colors]
+            if len(colors) != num_chains:
+                raise ValueError("Number of colors does not match the number of chains")
+        else:
             colors = DEFAULT_COLORLIST[:num_chains]
 
         if chain_labels is not None and len(chain_labels) != num_chains:
@@ -323,7 +337,10 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         truth_kwargs = dict(truth_kwargs or {})
         truth_kwargs = {"color": "k", "ls": "--", "lw": 1.2, **truth_kwargs}
 
-        kde_bw = kde_kwargs.get("bandwidth", "scott")
+        kde_bw = kde_kwargs.pop("bandwidth", "silverman")
+        kde_fast = kde_kwargs.pop("fast", True)
+        kde_num_1d = kde_kwargs.pop("num_1d", 512)
+        kde_num_2d = kde_kwargs.pop("num_2d", 80)
 
         if offdiag_mode not in OFFDIAG_MODES:
             raise ValueError(
@@ -375,7 +392,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                     continue
                 w = _weights[c_idx]
 
-                x, pdf = kde_1d(data, bw=kde_bw, weights=w)
+                x, pdf = kde_1d(data, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_1d)
                 lo, med, hi = get_credible_interval(data, credible_interval, weights=w)
 
                 ax.plot(x, pdf, **{"color": color, **kde_kwargs})
@@ -433,7 +450,9 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                     offdiag_hist_fn(ax, xd, yd, w, cmap, **offdiag_kwargs)
 
                     if _use_kde:
-                        x_out, y_out, z_out = kde_2d(xd, yd, bw=kde_bw, weights=w)
+                        x_out, y_out, z_out = kde_2d(
+                            xd, yd, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_2d
+                        )
                         lvls = hdi_levels(z_out, contour_levels)
 
                         if base_mode == "contour":
@@ -524,6 +543,20 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                     )
                 )
 
+            # If there's an existing legend, extract its handles and merge them
+            # so we maintain a single, combined figure legend.
+            if fig.legends:
+                old_leg = fig.legends[0]
+                existing_handles = old_leg.legend_handles
+                existing_labels = [t.get_text() for t in old_leg.get_texts()]
+                
+                combined_handles = list(existing_handles)
+                for h in handles:
+                    if h.get_label() not in existing_labels:
+                        combined_handles.append(h)
+                handles = combined_handles
+                old_leg.remove()
+
             max_handles_per_column = 4
 
             _legend_kwargs = {
@@ -537,8 +570,9 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
 
             _legend_kwargs.update(legend_kwargs or {})
 
-            # Place the legend next to the first diagonal panels
-            fig.legend(handles=handles, loc="upper center", **_legend_kwargs)
+            # Set the baseline anchor anchor point (upper left) so repositioning
+            # aligns the left edge correctly without overlapping left subplots
+            fig.legend(handles=handles, loc="upper left", **_legend_kwargs)
 
             # find where the diagonal panels end and move the legend there
             reposition_legend(fig, n_dim)

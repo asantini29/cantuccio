@@ -91,6 +91,22 @@ def _(cornerplot, first_chain, plt, styles):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ### ... change the KDE estimation method to use `KDEpy`'s `FFTKDE`...
+    """)
+    return
+
+
+@app.cell
+def _(cornerplot, first_chain, plt, styles):
+    _fig, _axs =cornerplot(samples=first_chain, offdiag_mode=styles.value, kde_kwargs={"fast": False})
+    _ =cornerplot(samples=first_chain, offdiag_mode=styles.value, kde_kwargs={"fast": True}, fig=_fig, axes=_axs, colors=["red"])
+    plt.show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ### ... add the true values...
     """)
     return
@@ -155,7 +171,7 @@ def _(mo):
 
 @app.cell
 def _(cornerplot, first_chain, plt, second_chain, truths):
-    _ = cornerplot(samples=[first_chain, second_chain], truths=truths, chain_labels=['first chain', 'second chain'])
+    _ = cornerplot(samples=[first_chain, second_chain], truths=truths, labels=['first chain', 'second chain'])
     plt.show()
     return
 
@@ -170,7 +186,7 @@ def _(mo):
 
 @app.cell
 def _(cornerplot, first_chain, plt, second_chain, truths):
-    _ = cornerplot(samples=[first_chain, second_chain], truths=truths, chain_labels=['first chain', 'second chain'], n_ticks=3)
+    _ = cornerplot(samples=[first_chain, second_chain], truths=truths, labels=['first chain', 'second chain'], n_ticks=3)
     plt.show()
     return
 
@@ -193,13 +209,32 @@ def _(cornerplot, first_chain, plt, second_chain, truths):
     _truths = truths.copy()
     _truths[r"$\mu_4$"] = truths[r"$\mu_1$"]
 
-    _ = cornerplot(samples=[first_chain, _second_chain], truths=_truths, chain_labels=['first chain', 'second chain'], n_ticks=3)
+    _ = cornerplot(samples=[first_chain, _second_chain], truths=_truths, labels=['first chain', 'second chain'], n_ticks=3)
     plt.show()
     return
 
 
 @app.cell
-def _():
+def _(mo):
+    mo.md(r"""
+    ### Now let's see how the corner plot looks for higly correlated parameters under the two KDE estimation methods.
+    """)
+    return
+
+
+@app.cell
+def _(np):
+    cov = np.array([[1, 0.99], [0.99, 1]])
+    x, y = np.random.multivariate_normal([0, 0], cov, size=1000).T
+    samples = {"x": x, "y": y}
+    return (samples,)
+
+
+@app.cell
+def _(cornerplot, plt, samples):
+    _fig, _axs = cornerplot(samples=samples, offdiag_mode='kde', labels='scipy KDE', )
+    _ = cornerplot(samples=samples, offdiag_mode='kde', kde_kwargs={"fast": True, "alpha": 0.5}, fig=_fig, axes=_axs, colors="red", labels='KDEpy FFTKDE')
+    plt.show()
     return
 
 

@@ -22,7 +22,9 @@
 > 1. an Italian biscuit from Tuscany.
 > 2. corner, nook.
 
-`cantuccio` is a Python library for creating corner plots, automatically handling the layout and size of labels, ticks, and legends. It is designed to be flexible and easy to use, allowing users to create publication-quality corner plots with minimal code. Visual choices are inspired by many of the existing corner plot libraries, with particular credit to [`corner`](https://corner.readthedocs.io/en/latest/), [`chainconsumer`](https://samreay.github.io/ChainConsumer/), [`cornetto`](https://cornetto.readthedocs.io/en/latest/), and [`makecorner`](https://github.com/tcallister/makecorner). 
+`cantuccio` is a Python library for creating corner plots, automatically handling the layout and size of labels, ticks, and legends. It is designed to be flexible and easy to use, allowing users to create publication-quality corner plots with minimal code. When dealing with large datasets, `cantuccio` can utilize the `KDEpy` package for faster KDE estimation. 
+
+Visual choices are inspired by many of the existing corner plot libraries, with particular credit to [`corner`](https://corner.readthedocs.io/en/latest/), [`chainconsumer`](https://samreay.github.io/ChainConsumer/), [`cornetto`](https://cornetto.readthedocs.io/en/latest/), and [`makecorner`](https://github.com/tcallister/makecorner). 
 
 ## Installation
 You can install `cantuccio` using pip:
