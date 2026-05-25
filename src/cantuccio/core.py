@@ -498,7 +498,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                     ax.set_ylabel(columns[i], fontsize=label_fontsize)
 
                     ax.yaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=True))
-                    ax.yaxis.offsetText.set_fontsize(label_fontsize)
+                    ax.yaxis.offsetText.set_fontsize(tick_labelsize)
 
                     ax.yaxis.labelpad = ylabelpad
                 else:
