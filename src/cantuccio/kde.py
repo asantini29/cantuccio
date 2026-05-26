@@ -12,7 +12,7 @@ from typing import Sequence
 import numpy as np
 from scipy.stats import gaussian_kde
 from KDEpy import FFTKDE
-PAD_VALUE = 0.05
+PAD_VALUE = 0.1
 
 def hdi_levels(z_out: np.ndarray, levels: Sequence[float]) -> list[float]:
     """
@@ -72,8 +72,10 @@ def _scipy_kde_1d(
     kde = gaussian_kde(data, bw_method=bw, weights=weights)
     span = data.max() - data.min() or 1.0
     pad = PAD_VALUE * span
-    x = np.linspace(data.min() - pad, data.max() + pad, n)
-    return x, kde(x)
+    x_grid = np.linspace(data.min() - pad, data.max() + pad, n)
+    pdf_grid = kde(x_grid)
+    x = np.linspace(data.min(), data.max(), n)
+    return x, np.interp(x, x_grid, pdf_grid)
 
 
 def _scipy_kde_2d(
@@ -149,10 +151,14 @@ def _fft_kde_1d(
     absolute_bw = np.sqrt(_scipy_kde.covariance[0, 0])
     kde = FFTKDE(bw=absolute_bw)
     
-    span = data.max() - data.min() or 1.0
+    min_val, max_val = data.min(), data.max()
+    span = max_val - min_val or 1.0
     pad = PAD_VALUE * span
-    x = np.linspace(data.min() - pad, data.max() + pad, n)
-    pdf = kde.fit(data, weights=weights).evaluate(x)
+    x_grid = np.linspace(min_val - pad, max_val + pad, n)
+    pdf_grid = kde.fit(data, weights=weights).evaluate(x_grid)
+
+    x = np.linspace(min_val, max_val, n)
+    pdf = np.interp(x, x_grid, pdf_grid)
     return x, pdf
 
 

@@ -166,6 +166,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
     labels: Optional[str | list[str]] = None,
     colors: Optional[list[str]] = None,
     contour_levels: tuple[float, ...] = (0.68, 0.90),
+    periodic: dict[str, float] | None = None,
     title_format: Optional[str] = None,
     fig: Optional[Figure] = None,
     axes: Optional[np.ndarray] = None,
@@ -205,6 +206,8 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         List of colors for the chains. If not provided, default colors will be used.
     contour_levels : tuple[float, ...], default (0.68, 0.90)
         Levels for the 2D contour plots, specified as fractions of the total probability mass (e.g., 0.68 for 68% credible region).
+    periodic : dict[str, float], optional
+        Dictionary mapping parameter names to their period (e.g., {"phi": 2 * np.pi} for an angle parameter). If provided, these parameters will be unwrapped for plotting.
     title_format : str, optional
         Format string for the titles on the diagonal panels. If provided, the median and credible interval will be included in the title for each parameter. The format string should be suitable for formatting the median and interval widths, e.g. ".2f" for 2 decimal places.
     fig : matplotlib.figure.Figure, optional
@@ -282,6 +285,12 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
 
         if chain_labels is not None and len(chain_labels) != num_chains:
             raise ValueError("Number of labels does not match the number of chains")
+        
+        if periodic is not None:
+            for chain in samples:
+                for param, period in periodic.items():
+                    if param in chain:
+                        chain[param] = np.unwrap(chain[param], period=period)
 
         if plot_delta and truths is None:
             raise ValueError(
