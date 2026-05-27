@@ -37,3 +37,19 @@ fig, ax = cornerplot(
 )
 fig.savefig("tests/periodic_plot_hexbin.png")
 print("Cornerplot test saved to tests/periodic_plot_hexbin.png")
+
+
+# Now let's impose periodicity on a cloud that is centered in the middle of the range, to check that it doesn't mess with non-periodic dimensions.
+data3 = np.random.normal(0, 1, 1000)
+samples["other"] = data3
+periodic["other"] = (-2*np.pi, 2*np.pi)
+
+
+fig, ax = cornerplot(
+    samples, 
+    periodic=periodic,
+    kde_kwargs={"fast": True},
+    offdiag_mode="hexbin+kde"
+)
+fig.savefig("tests/periodic_plot_extra.png")
+print("Cornerplot test saved to tests/periodic_plot_extra.png")

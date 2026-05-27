@@ -322,6 +322,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
     periodic : dict[str, tuple[float, float]], optional
         Dictionary mapping parameter names to their wrapped domain boundaries (e.g., {"phi": (0, 2 * np.pi)} for an angle parameter).
         If provided, the KDE contours and 1D marginal regions correctly integrate mathematically over boundaries to fold and wrap inside this topology.
+        We recommend providing the periodic bounds only for parameters that wrap within the range of the samples. 
     title_format : str, optional
         Format string for the titles on the diagonal panels. If provided, the median and credible interval will be included in the title for each parameter. The format string should be suitable for formatting the median and interval widths, e.g. ".2f" for 2 decimal places.
     fig : matplotlib.figure.Figure, optional
@@ -523,7 +524,17 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                 ax.plot(x, pdf, **{"color": color, **kde_kwargs})
                 
                 if periodic_bnds is not None:
-                    ax.set_xlim(periodic_bnds)
+                    data_limits = (data.min(), data.max())
+                    # If the data is well within the periodic bounds, set the x-limits to the data range for better visualization. Otherwise, set the x-limits to the periodic bounds.
+                    left_limit = periodic_bnds[0] if data_limits[0] < periodic_bnds[0] * 1.1 else data_limits[0]
+                    right_limit = periodic_bnds[1] if data_limits[1] > periodic_bnds[1] * 0.9 else data_limits[1]
+
+                    # now check if the ax has already limits set by the previous chains, and if so, take the union of the limits to ensure all chains are visible
+                    current_left, current_right = ax.get_xlim()
+                    left_limit = min(left_limit, current_left)
+                    right_limit = max(right_limit, current_right)
+
+                    ax.set_xlim(left_limit, right_limit)
                     flat = np.sort(pdf)[::-1]
                     dx = np.diff(x)[0] if len(x) > 1 else 1.0
                     cumfrac = np.cumsum(flat * dx)
@@ -604,35 +615,39 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                     offdiag_hist_fn(ax, xd_plot, yd_plot, w, cmap, **offdiag_kwargs)
 
                     if _use_kde:
+                        kde_num_2d_here = kde_num_2d if periodic_x is None and periodic_y is None else 800
                         x_out, y_out, z_out = kde_2d(
-                            xd, yd, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_2d,
+                            xd, yd, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_2d_here,
                             periodic_x=periodic_x, periodic_y=periodic_y
                         )
-                        lvls = hdi_levels(z_out, contour_levels)
+                        raw_lvls = hdi_levels(z_out, contour_levels)
+                        lvls = np.unique(raw_lvls)
+                        lvls = lvls[lvls < z_out.max()].tolist()
 
-                        if base_mode == "contour":
-                            r, g, b, _ = to_rgba(color)
-                            # Power-law scaling: squaring the fraction gives 4:1 inner/outer ratio
-                            band_colors = [
-                                (r, g, b, 0.50 * ((k + 1) / len(lvls)) ** 2)
-                                for k in range(len(lvls))
-                            ]
-                            ax.contourf(
-                                x_out,
-                                y_out,
-                                z_out,
-                                levels=[*lvls, z_out.max()],
-                                colors=band_colors,
-                            )
+                        if len(lvls) > 0:
+                            if base_mode == "contour":
+                                r, g, b, _ = to_rgba(color)
+                                # Power-law scaling: squaring the fraction gives 4:1 inner/outer ratio
+                                band_colors = [
+                                    (r, g, b, 0.50 * ((k + 1) / len(lvls)) ** 2)
+                                    for k in range(len(lvls))
+                                ]
+                                ax.contourf(
+                                    x_out,
+                                    y_out,
+                                    z_out,
+                                    levels=[*lvls, z_out.max()],
+                                    colors=band_colors,
+                                )
 
-                        if overlay_mode == "kde" or base_mode == "kde":
-                            ax.contour(
-                                x_out,
-                                y_out,
-                                z_out,
-                                levels=lvls,
-                                **{"colors": [color], **offdiag_kwargs},
-                            )
+                            if overlay_mode == "kde" or base_mode == "kde":
+                                ax.contour(
+                                    x_out,
+                                    y_out,
+                                    z_out,
+                                    levels=lvls,
+                                    **{"colors": [color], **offdiag_kwargs},
+                                )
 
                 if i == n_dim - 1:
                     ax.set_xlabel(columns[j], fontsize=label_fontsize)
