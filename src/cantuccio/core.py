@@ -62,6 +62,39 @@ def _hexbin_fn(ax, x, y, weights, cmap, **kwargs):
 def _pass_fn(*args, **kwargs):
     pass
 
+def get_credible_interval(
+    data: np.ndarray, level: float, weights: np.ndarray | None = None
+) -> tuple[float, float, float]:
+    """
+    Return (lower, median, upper) for a highest-density credible interval.
+    Standalone function for users who want to compute credible intervals without going through the kde estimation. This is not used internally by the :meth:`cornerplot` method.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        1D array of samples.
+    level : float
+        Credible interval level, e.g. 0.90 for a 90% credible interval.
+    weights : np.ndarray, optional
+        1D array of weights corresponding to the samples.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        A tuple containing the lower bound, median, and upper bound of the credible interval.
+    """
+    lo = 100 * (1.0 - level) / 2.0
+    percentiles = [lo, 50.0, 100.0 - lo]
+    if weights is None:
+        return tuple(np.percentile(data, percentiles))
+
+    i = np.argsort(data)
+    d = data[i]
+    w = weights[i]
+    cdf = np.cumsum(w) - 0.5 * w
+    cdf /= np.sum(w)
+    return tuple(np.interp(np.array(percentiles) / 100.0, cdf, d))
+
 
 def get_credible_interval_median(
     x: np.ndarray, pdf: np.ndarray, level: float,
