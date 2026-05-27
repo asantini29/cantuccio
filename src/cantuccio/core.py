@@ -18,6 +18,7 @@ from matplotlib import pyplot as plt
 from matplotlib import ticker
 from matplotlib.colors import to_rgba
 from matplotlib.figure import Figure
+from scipy.interpolate import interp1d
 
 from .kde import hdi_levels, kde_1d, kde_2d
 from .visuals import (
@@ -61,12 +62,12 @@ def _hexbin_fn(ax, x, y, weights, cmap, **kwargs):
 def _pass_fn(*args, **kwargs):
     pass
 
-
 def get_credible_interval(
     data: np.ndarray, level: float, weights: np.ndarray | None = None
 ) -> tuple[float, float, float]:
     """
     Return (lower, median, upper) for a highest-density credible interval.
+    Standalone function for users who want to compute credible intervals without going through the kde estimation. This is not used internally by the :meth:`cornerplot` method.
 
     Parameters
     ----------
@@ -94,6 +95,115 @@ def get_credible_interval(
     cdf /= np.sum(w)
     return tuple(np.interp(np.array(percentiles) / 100.0, cdf, d))
 
+
+def get_credible_interval_median(
+    x: np.ndarray, pdf: np.ndarray, level: float,
+) -> tuple[float, float, float]:
+    """
+    Return (lower, median, upper). The median is the value of x at which the cumulative distribution function (CDF) reaches 0.5, and the lower and upper bounds are the values of x at which the CDF reaches (1 - level) / 2 and 1 - (1 - level) / 2, respectively.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        1D array of samples.
+    pdf : np.ndarray
+        1D array of probability density values corresponding to the samples.
+    level : float
+        Credible interval level, e.g. 0.90 for a 90% credible interval.
+
+    Returns
+    -------
+    tuple[float, float, float]
+        A tuple containing the lower bound, median, and upper bound of the credible interval.
+    """
+    assert level < 1.0, "Credible interval level must be less than 1.0"
+    vals = [0.5 - level / 2, 0.5, 0.5 + level / 2]
+    cdf = pdf.cumsum()
+    cdf /= cdf.max()  # Normalize to ensure the cumulative distribution goes from 0 to 1
+    bounds = interp1d(cdf, x)(vals)
+    bounds[1] = 0.5 * (bounds[0] + bounds[2])
+    return tuple(bounds)
+
+def get_credible_interval_hdi(
+        x: np.ndarray, pdf: np.ndarray, level: float
+) -> tuple[float, float, float]:
+    """
+    Return (lower, center, upper) for the highest-density credible interval.
+
+    Routine adapted from the `ChainConsumer` package: https://samreay.github.io/ChainConsumer/, doi:10.21105/joss.00045.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        1D array of samples.
+    pdf : np.ndarray
+        1D array of probability density values corresponding to the samples.
+    level : float
+        Credible interval level, e.g. 0.90 for a 90% credible interval.
+    
+    Returns
+    -------
+    tuple[float, float, float]
+        A tuple containing the lower bound, center, and upper bound of the highest-density interval.
+    """
+    cdf = pdf.cumsum()
+    cdf /= cdf.max()  # Normalize to ensure the cumulative distribution goes from 0 to 1
+
+    x_in = np.concatenate([[x[0]], x])
+    cdf_in = np.concatenate([[0.0], cdf])
+
+    eps = 1e-12
+    best_width = float("inf")
+    best_lower = float(x_in[0])
+    best_upper = float(x_in[-1])
+    best_start_mass = 0.0
+    best_end_mass = 1.0
+
+    for start_idx, start_mass in enumerate(cdf_in[:-1]):
+        target = start_mass + level
+        if target > 1.0 + eps:
+            break
+
+        end_idx = np.searchsorted(cdf_in, target, side="left")
+
+        # Ensure at least one point is in the interval
+        if end_idx <= start_idx:
+            end_idx = start_idx + 1
+        if end_idx >= cdf_in.size:
+            break
+
+        # If still slightly under target, move one step right if possible
+        if cdf_in[end_idx] - start_mass < level - eps and end_idx + 1 < cdf_in.size:
+            end_idx += 1
+
+        lower = float(x_in[start_idx])
+        upper = float(x_in[end_idx])
+        width = upper - lower
+        if width <= eps:
+            continue
+
+        if width < best_width - eps:
+            best_width = width
+            best_lower = lower
+            best_upper = upper
+            best_start_mass = float(start_mass)
+            best_end_mass = float(cdf_in[end_idx])
+
+    interval_mass = best_end_mass - best_start_mass
+
+    if interval_mass <= eps:
+        center = 0.5 * (best_lower + best_upper)
+
+    else:
+        center_mass = best_start_mass + 0.5 * interval_mass
+        center = float(np.interp(center_mass, cdf_in, x_in, left=best_lower, right=best_upper))
+
+    return best_lower, center, best_upper
+
+_CREDIBLE_INTERVAL_REGISTRY = {
+    "median": get_credible_interval_median,
+    "hdi": get_credible_interval_hdi,
+}
 
 def overplot_lines(
     axes: np.ndarray,
@@ -162,11 +272,12 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
     weights: np.ndarray | list[np.ndarray] | None = None,
     truths: Optional[dict] = None,
     plot_delta: bool = False,
+    periodic: Optional[dict[str, tuple[float, float]]] = None,
     credible_interval: float = 0.90,
+    statistic: str = "median",
     labels: Optional[str | list[str]] = None,
     colors: Optional[list[str]] = None,
     contour_levels: tuple[float, ...] = (0.68, 0.90),
-    periodic: dict[str, float] | None = None,
     title_format: Optional[str] = None,
     fig: Optional[Figure] = None,
     axes: Optional[np.ndarray] = None,
@@ -200,14 +311,17 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         If True, plot the difference between the samples and the truths (i.e., Δ = samples - truths) instead of the raw samples. Requires `truths` to be provided.
     credible_interval : float, default 0.90
         Credible interval level for shading the 1D KDE plots on the diagonal.
+    statistic : str, default "median"
+        Statistic to compute for the titles on the diagonal panels. Options are "median" or "hdi". The latter follows the `ChainConsumer` implementation. Refer to the :meth:`get_credible_interval_median` and :meth:`get_credible_interval_hdi` for details.
     labels : str or list[str], optional
         Label(s) for the chain(s) to be used in the legend. If a single string is provided and multiple chains are given, the same label will be used for all chains.
     colors : list[str], optional
         List of colors for the chains. If not provided, default colors will be used.
     contour_levels : tuple[float, ...], default (0.68, 0.90)
         Levels for the 2D contour plots, specified as fractions of the total probability mass (e.g., 0.68 for 68% credible region).
-    periodic : dict[str, float], optional
-        Dictionary mapping parameter names to their period (e.g., {"phi": 2 * np.pi} for an angle parameter). If provided, these parameters will be unwrapped for plotting.
+    periodic : dict[str, tuple[float, float]], optional
+        Dictionary mapping parameter names to their wrapped domain boundaries (e.g., {"phi": (0, 2 * np.pi)} for an angle parameter).
+        If provided, the KDE contours and 1D marginal regions correctly integrate mathematically over boundaries to fold and wrap inside this topology.
     title_format : str, optional
         Format string for the titles on the diagonal panels. If provided, the median and credible interval will be included in the title for each parameter. The format string should be suitable for formatting the median and interval widths, e.g. ".2f" for 2 decimal places.
     fig : matplotlib.figure.Figure, optional
@@ -285,12 +399,9 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
 
         if chain_labels is not None and len(chain_labels) != num_chains:
             raise ValueError("Number of labels does not match the number of chains")
-        
-        if periodic is not None:
-            for chain in samples:
-                for param, period in periodic.items():
-                    if param in chain:
-                        chain[param] = np.unwrap(chain[param], period=period)
+            
+        # We no longer manually unwrap the data here. The user passes the data wrapped or unwrapped, 
+        # and KDE evaluates and folds correctly onto [low, high] bounds based on `periodic`.
 
         if plot_delta and truths is None:
             raise ValueError(
@@ -377,6 +488,9 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
             offdiag_hist_fn = _pass_fn
 
         _use_kde = base_mode in ["contour", "kde"] or overlay_mode == "kde"
+        
+        if statistic not in _CREDIBLE_INTERVAL_REGISTRY:
+            raise ValueError(f"Invalid statistic {statistic!r}. Supported options are: {list(_CREDIBLE_INTERVAL_REGISTRY.keys())}")
 
         # ── figure / axes / fontsizes ──────────────────────────────────────────
         if fig is None or axes is None:
@@ -401,11 +515,26 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                     continue
                 w = _weights[c_idx]
 
-                x, pdf = kde_1d(data, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_1d)
-                lo, med, hi = get_credible_interval(data, credible_interval, weights=w)
+                periodic_bnds = periodic.get(columns[i]) if periodic else None
+                x, pdf = kde_1d(data, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_1d, periodic=periodic_bnds)
+
+                lo, med, hi = _CREDIBLE_INTERVAL_REGISTRY[statistic](x, pdf, credible_interval)
 
                 ax.plot(x, pdf, **{"color": color, **kde_kwargs})
-                mask = (x >= lo) & (x <= hi)
+                
+                if periodic_bnds is not None:
+                    ax.set_xlim(periodic_bnds)
+                    flat = np.sort(pdf)[::-1]
+                    dx = np.diff(x)[0] if len(x) > 1 else 1.0
+                    cumfrac = np.cumsum(flat * dx)
+                    # Normalize if precision lost
+                    if cumfrac[-1] > 0:
+                        cumfrac /= cumfrac[-1]
+                    idx = min(int(np.searchsorted(cumfrac, credible_interval)), len(flat) - 1)
+                    mask = pdf >= flat[idx]
+                else:
+                    mask = (x >= lo) & (x <= hi)
+                    
                 if base_mode != "kde":
                     ax.fill_between(x, pdf, where=mask, color=color, alpha=0.50)
 
@@ -461,11 +590,23 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                     w = _weights[c_idx]
                     cmap = chain_cmap(color)
 
-                    offdiag_hist_fn(ax, xd, yd, w, cmap, **offdiag_kwargs)
+                    periodic_x = periodic.get(columns[j]) if periodic else None
+                    periodic_y = periodic.get(columns[i]) if periodic else None
+
+                    xd_plot, yd_plot = xd, yd
+                    if periodic_x is not None:
+                        lx, hx = periodic_x
+                        xd_plot = lx + (xd - lx) % (hx - lx)
+                    if periodic_y is not None:
+                        ly, hy = periodic_y
+                        yd_plot = ly + (yd - ly) % (hy - ly)
+
+                    offdiag_hist_fn(ax, xd_plot, yd_plot, w, cmap, **offdiag_kwargs)
 
                     if _use_kde:
                         x_out, y_out, z_out = kde_2d(
-                            xd, yd, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_2d
+                            xd, yd, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_2d,
+                            periodic_x=periodic_x, periodic_y=periodic_y
                         )
                         lvls = hdi_levels(z_out, contour_levels)
 
