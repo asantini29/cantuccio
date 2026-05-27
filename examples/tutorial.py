@@ -238,5 +238,74 @@ def _(cornerplot, plt, samples):
     return
 
 
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    ### Median-symmetric vs highest-density credible intervals
+    """)
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    For symmetric, unimodal distributions, the two methods give the same result. However, for skewed or multimodal distributions, they can differ significantly:
+    """)
+    return
+
+
+@app.cell
+def _(cornerplot, plt, samples):
+    _fig, _axs = cornerplot(samples=samples, statistic="median", labels='median-symmetric')
+    _ = cornerplot(samples=samples, statistic="hdi", labels='highest-density', fig=_fig, axes=_axs, colors="red")
+    plt.show()
+    return
+
+
+@app.cell
+def _(get_samples, np):
+    # let's generate multimodal samples
+    multi_mus = [5, 3, 10]
+    multi_vars = [2, 1, 5]
+    component_1 = get_samples(multi_mus, multi_vars, 1000)
+    multi_mus = [10, 12, 20]
+    multi_vars = [0.2, 1, 0.5]
+    component_2 = get_samples(multi_mus, multi_vars, 1000)
+
+    multi_samples = {k: np.concatenate([component_1[k], component_2[k]]) for k in component_1.keys()}
+    return (multi_samples,)
+
+
+@app.cell
+def _(cornerplot, multi_samples, plt):
+    _fig, _axs = cornerplot(samples=multi_samples, statistic="median", labels='median-symmetric')
+    _ = cornerplot(samples=multi_samples, statistic="hdi", labels='highest-density', fig=_fig, axes=_axs, colors="red")
+    plt.show()
+    return
+
+
+@app.cell
+def _(scipy):
+    # now let's try with a skewed distribution
+    skewed_samples_x = scipy.stats.distributions.skewnorm(a=10).rvs(size=1000)
+    skewed_samples_y = scipy.stats.distributions.skewnorm(a=-10).rvs(size=1000)
+    skewed_samples = {"x": skewed_samples_x, "y": skewed_samples_y}
+
+    return (skewed_samples,)
+
+
+@app.cell
+def _(cornerplot, plt, skewed_samples):
+    _fig, _axs = cornerplot(samples=skewed_samples, statistic="median", labels='median-symmetric')
+    _ = cornerplot(samples=skewed_samples, statistic="hdi", labels='highest-density', fig=_fig, axes=_axs, colors="red")
+    plt.show()
+    return
+
+
+@app.cell
+def _():
+    return
+
+
 if __name__ == "__main__":
     app.run()
