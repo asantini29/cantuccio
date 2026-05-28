@@ -506,6 +506,9 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
             for j in range(i + 1, n_dim):
                 axes[i, j].set_visible(False)
 
+        all_left_limit = {k: float("inf") for k in columns}
+        all_right_limit = {k: float("-inf") for k in columns}
+
         # ── diagonal: 1D KDE ──────────────────────────────────────────────────────
         for i in range(n_dim):
             ax = axes[i, i]
@@ -526,15 +529,15 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
                 if periodic_bnds is not None:
                     data_limits = (data.min(), data.max())
                     # If the data is well within the periodic bounds, set the x-limits to the data range for better visualization. Otherwise, set the x-limits to the periodic bounds.
-                    left_limit = periodic_bnds[0] if data_limits[0] < periodic_bnds[0] * 1.1 else data_limits[0]
-                    right_limit = periodic_bnds[1] if data_limits[1] > periodic_bnds[1] * 0.9 else data_limits[1]
+                    current_left = periodic_bnds[0] if data_limits[0] < periodic_bnds[0] * 1.001 else data_limits[0]
+                    current_right = periodic_bnds[1] if data_limits[1] > periodic_bnds[1] * 0.999 else data_limits[1]
 
                     # now check if the ax has already limits set by the previous chains, and if so, take the union of the limits to ensure all chains are visible
-                    current_left, current_right = ax.get_xlim()
-                    left_limit = min(left_limit, current_left)
-                    right_limit = max(right_limit, current_right)
+                    all_left_limit[columns[i]] = min(all_left_limit[columns[i]], current_left)
+                    all_right_limit[columns[i]] = max(all_right_limit[columns[i]], current_right)
 
-                    ax.set_xlim(left_limit, right_limit)
+                    ax.set_xlim(all_left_limit[columns[i]], all_right_limit[columns[i]])
+                    
                     flat = np.sort(pdf)[::-1]
                     dx = np.diff(x)[0] if len(x) > 1 else 1.0
                     cumfrac = np.cumsum(flat * dx)
