@@ -373,19 +373,20 @@ def overlay_covariance(
     if covariance.shape != (n_params, n_params):
         raise ValueError(f"Covariance matrix must be square, got shape {covariance.shape}")
 
+    # The figure must be an (n_params x n_params) corner-plot grid.
+    n_axs = int(round(np.sqrt(len(axs))))
+    if n_axs != n_params:
+        raise ValueError(
+            f"covariance has {n_params} parameters but the figure looks like a "
+            f"{n_axs}x{n_axs} corner plot ({len(axs)} axes); sizes must match"
+        )
+
     # Set default means to origin
     if means is None:
         means = np.zeros(n_params)
     elif len(means) != n_params:
         raise ValueError(f"means must have length {n_params}, got {len(means)}")
     
-    if isinstance(colors, str):
-        colors = [colors] * len(levels if levels is not None else num_sigmas)
-    if isinstance(linestyles, str):
-        linestyles = [linestyles] * len(levels if levels is not None else num_sigmas)
-    if isinstance(linewidths, (int, float)):
-        linewidths = [linewidths] * len(levels if levels is not None else num_sigmas)
-
     # Resolve the per-level radii (in units of sigma along the principal axes).
     # A 2D ellipse and a 1D interval enclosing the *same* probability mass sit at
     # different radii (chi-square with df=2 vs df=1), so we keep them separate.
@@ -400,7 +401,8 @@ def overlay_covariance(
         radii_1d = num_sigmas
         n_levels = len(num_sigmas)
 
-    # Set default colors
+    # Normalize per-level styling. Each may be given as a single value (broadcast
+    # to every level) or as a per-level sequence (validated against n_levels).
     if colors is None:
         colors = [f'C{i}' for i in range(n_levels)]
     elif isinstance(colors, str):
@@ -408,15 +410,17 @@ def overlay_covariance(
     elif len(colors) != n_levels:
         raise ValueError(f"colors must have length {n_levels}, got {len(colors)}")
 
-    # Set default linestyles
     if linestyles is None:
         linestyles = ['-'] * n_levels
+    elif isinstance(linestyles, str):
+        linestyles = [linestyles] * n_levels
     elif len(linestyles) != n_levels:
         raise ValueError(f"linestyles must have length {n_levels}, got {len(linestyles)}")
 
-    # Set default linewidths
     if linewidths is None:
         linewidths = [1.5] * n_levels
+    elif isinstance(linewidths, (int, float)):
+        linewidths = [linewidths] * n_levels
     elif len(linewidths) != n_levels:
         raise ValueError(f"linewidths must have length {n_levels}, got {len(linewidths)}")
 
@@ -426,8 +430,7 @@ def overlay_covariance(
     # Reshape axes into 2D grid if needed
     if axs.ndim == 1:
         # Corner plot axes are typically returned as 1D array
-        # Reshape to (n_params, n_params) grid
-        n_axs = int(np.sqrt(len(axs)))
+        # Reshape to (n_axs, n_axs) grid (n_axs == n_params, validated above)
         axs_grid = np.empty((n_axs, n_axs), dtype=object)
         idx = 0
         for i in range(n_axs):
