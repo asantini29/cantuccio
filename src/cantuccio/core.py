@@ -46,7 +46,6 @@ OFFDIAG_MODES = {
 
 DIAG_MODES = {"kde", "hist"}
 
-ALPHA_SHADING = 0.
 ALPHA_CREDIBLE_INTERVAL = 0.5
 
 
@@ -536,7 +535,7 @@ def overlay_covariance(
 
     return fig
 
-def _place_legend(fig, axes, chain_labels, colors, truths, truth_kwargs, num_chains, n_dim,
+def _place_legend(fig, chain_labels, colors, truths, truth_kwargs, num_chains, n_dim,
                   label_fontsize, legend_kwargs) -> None:
     if chain_labels is not None:
         handles = [
@@ -596,10 +595,6 @@ def _sync_axes(axes, n_dim, n_ticks) -> None:
         return ticker.MaxNLocator(
             nbins=n_ticks - 1, prune=None, min_n_ticks=n_ticks
         )
-
-    # def _make_locator():
-    #     # LinearLocator strictly guarantees `numticks` but the numbers might have decimals
-    #     return ticker.LinearLocator(numticks=n_ticks)
 
     for i in range(n_dim):
         xlim = axes[i, i].get_xlim()
@@ -777,10 +772,8 @@ def _plot_diagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, di
 
             if base_mode != "kde":
                 if diag_mode == "kde":
-                    ax.fill_between(x, pdf, color=color, alpha=ALPHA_SHADING)
                     ax.fill_between(x, pdf, where=mask, color=color, alpha=ALPHA_CREDIBLE_INTERVAL)
                 else:
-                    ax.fill_between(x, pdf, step="mid", color=color, alpha=ALPHA_SHADING)
                     ax.fill_between(x, pdf, where=mask, step="mid", color=color, alpha=ALPHA_CREDIBLE_INTERVAL)
 
             if title_format is not None:
@@ -1131,7 +1124,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         _sync_axes(axes, n_dim, n_ticks)
 
         # ── optional legend ────────────────────────────────────────────────────────
-        _place_legend(fig, axes, chain_labels, colors, truths, truth_kwargs, num_chains, n_dim,
+        _place_legend(fig, chain_labels, colors, truths, truth_kwargs, num_chains, n_dim,
                       label_fontsize, legend_kwargs)
 
         fig.align_labels()

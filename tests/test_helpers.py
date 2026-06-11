@@ -120,7 +120,7 @@ def test_place_legend_adds_legend_when_labels_provided(monkeypatch):
     # rcParams["legend.fontsize"] may be a non-numeric string (e.g. "medium") in the
     # Agg test session, which causes scale_font to raise TypeError. Set a numeric value.
     monkeypatch.setitem(matplotlib.rcParams, "legend.fontsize", 10)
-    _place_legend(fig, axes, chain_labels=["chain A"], colors=["#1f77b4"],
+    _place_legend(fig, chain_labels=["chain A"], colors=["#1f77b4"],
                   truths=None, truth_kwargs={}, num_chains=1, n_dim=2,
                   label_fontsize=10, legend_kwargs=None)
     assert len(fig.legends) == 1
@@ -129,7 +129,7 @@ def test_place_legend_adds_legend_when_labels_provided(monkeypatch):
 
 def test_place_legend_no_legend_when_labels_none():
     fig, axes, all_left_limit, all_right_limit = _setup_figure(None, None, 2, ["x", "y"])
-    _place_legend(fig, axes, chain_labels=None, colors=["#1f77b4"],
+    _place_legend(fig, chain_labels=None, colors=["#1f77b4"],
                   truths=None, truth_kwargs={}, num_chains=1, n_dim=2,
                   label_fontsize=10, legend_kwargs=None)
     assert len(fig.legends) == 0
