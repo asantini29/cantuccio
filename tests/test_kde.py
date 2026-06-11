@@ -77,11 +77,53 @@ def test_kde_2d_multimodal():
     z_slow_on_fast_grid = interp_slow((y_fast, x_fast))
     
     np.testing.assert_allclose(np.max(z_fast), np.max(z_slow), rtol=0.05)
-    
+
     mask = z_slow_on_fast_grid > 0.05 * np.max(z_slow_on_fast_grid)
     np.testing.assert_allclose(
-        z_fast[mask], 
-        z_slow_on_fast_grid[mask], 
-        atol=1e-2, 
+        z_fast[mask],
+        z_slow_on_fast_grid[mask],
+        atol=1e-2,
         rtol=5e-2
     )
+
+
+# ---------------------------------------------------------------------------
+# Periodic KDE tests (Plan 02-02)
+# ---------------------------------------------------------------------------
+
+def test_kde_1d_periodic_x_bounds():
+    np.random.seed(42)
+    data = np.random.uniform(0, 10, 1000)
+    x, pdf = kde_1d(data, bw="scott", n=256, fast=True, periodic=(0.0, 10.0))
+    assert np.isclose(x[0], 0.0)
+    assert np.isclose(x[-1], 10.0)
+
+
+def test_kde_1d_periodic_normalization():
+    np.random.seed(42)
+    data = np.random.uniform(0, 10, 1000)
+    x, pdf = kde_1d(data, bw="scott", n=512, fast=True, periodic=(0.0, 10.0))
+    integral = np.trapezoid(pdf, x)
+    assert 0.5 < integral < 1.5
+
+
+def test_kde_1d_periodic_boundary_continuity():
+    np.random.seed(42)
+    data = np.random.uniform(0, 10, 1000)
+    x, pdf = kde_1d(data, bw="scott", n=512, fast=True, periodic=(0.0, 10.0))
+    assert abs(pdf[0] - pdf[-1]) < 0.05 * pdf.mean()
+
+
+def test_kde_2d_periodic_output_shape():
+    np.random.seed(42)
+    x_data = np.random.uniform(0, 2 * np.pi, 500)
+    y_data = np.random.uniform(0, 2 * np.pi, 500)
+    X, Y, Z = kde_2d(
+        x_data, y_data, bw="scott", n=32, fast=True,
+        periodic_x=(0.0, 2 * np.pi), periodic_y=(0.0, 2 * np.pi),
+    )
+    assert Z.shape == (32, 32)
+    assert np.isclose(X[0, 0], 0.0)
+    assert np.isclose(X[0, -1], 2 * np.pi)
+    assert np.isclose(Y[0, 0], 0.0)
+    assert np.isclose(Y[-1, 0], 2 * np.pi)

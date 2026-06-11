@@ -241,6 +241,41 @@ def _(cornerplot, plt, samples):
 @app.cell(hide_code=True)
 def _(mo):
     mo.md(r"""
+    ### And against the histogram:
+    """)
+    return
+
+
+@app.cell
+def _(cornerplot, plt, samples):
+    _fig, _axs = cornerplot(samples=samples, offdiag_mode='kde', diag_mode='hist', colors="k", labels='histogram')
+    _fig, _axs = cornerplot(samples=samples, offdiag_mode='kde', kde_kwargs={"fast": False, "alpha": 0.5}, labels='scipy KDE', fig=_fig, axes=_axs)
+    _fig, _axs = cornerplot(samples=samples, offdiag_mode='kde', kde_kwargs={"fast": True, "alpha": 0.5}, fig=_fig, axes=_axs, colors="red", labels='KDEpy FFTKDE')
+
+    plt.show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
+    #### Using KDEs or histograms can provide slightly different estimated credible intervals.
+    """)
+    return
+
+
+@app.cell
+def _(cornerplot, plt, samples):
+    _fig, _axs = cornerplot(samples=samples, diag_mode='hist', colors="k", labels='histogram')
+    _fig, _axs = cornerplot(samples=samples, labels='KDE', fig=_fig, axes=_axs)
+
+    plt.show()
+    return
+
+
+@app.cell(hide_code=True)
+def _(mo):
+    mo.md(r"""
     ### Median-symmetric vs highest-density credible intervals
     """)
     return
@@ -290,7 +325,6 @@ def _(scipy):
     skewed_samples_x = scipy.stats.distributions.skewnorm(a=10).rvs(size=1000)
     skewed_samples_y = scipy.stats.distributions.skewnorm(a=-10).rvs(size=1000)
     skewed_samples = {"x": skewed_samples_x, "y": skewed_samples_y}
-
     return (skewed_samples,)
 
 
@@ -303,7 +337,40 @@ def _(cornerplot, plt, skewed_samples):
 
 
 @app.cell
+def _(mo):
+    mo.md(r"""
+    ### We can also overlay a covariance matrix ellipse on top of our corner plot if we have it available:
+    """)
+    return
+
+
+@app.cell
+def _(get_samples, np):
+    new_mus = [5, 3, 10]
+    new_vars = np.array([2, 1, 5])
+
+    new_chain = get_samples(new_mus, new_vars, 1000)
+    return new_chain, new_mus, new_vars
+
+
+@app.cell
 def _():
+    from cantuccio.core import overlay_covariance
+
+    return (overlay_covariance,)
+
+
+@app.cell
+def _(cornerplot, new_chain, new_mus, new_vars, np, overlay_covariance, plt):
+    _fig, _axs = cornerplot(samples=new_chain, contour_levels=[0.68, 0.90], labels='samples')
+    new_cov = np.diag(new_vars**2)
+    # Pass credible masses via `levels` (matching `contour_levels`) so the FIM
+    # ellipses line up with the corner contours. `num_sigmas` instead draws
+    # fixed-radius ellipses: a "1 sigma" ellipse encloses only 39% of the 2D
+    # mass, not the 68% that 1 sigma covers in 1D, so it would look too small.
+    _fig = overlay_covariance(_fig, new_cov, means=new_mus, plot_1d=True, colors='k', levels=[0.68, 0.90],  label='generating distribution')
+
+    plt.show()
     return
 
 
