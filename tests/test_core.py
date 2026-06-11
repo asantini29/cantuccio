@@ -1,6 +1,7 @@
 import numpy as np
 import pytest
 
+import cantuccio.core as core
 from cantuccio.core import get_credible_interval, cornerplot
 
 
@@ -86,3 +87,23 @@ def test_cornerplot_multiple_chains_not_full():
     fig, axes = cornerplot([chain1, chain2])
     assert fig is not None
     assert axes.shape == (3, 3)
+
+
+def test_cornerplot_hist_diag_do_not_use_kde(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("kde_1d should not be called when diag_mode='hist'")
+
+    monkeypatch.setattr(core, "kde_1d", fail_if_called)
+
+    samples = {"x": np.random.randn(100)}
+    fig, axes = cornerplot(samples, diag_mode="hist")
+
+    assert fig is not None
+    assert axes.shape == (1, 1)
+
+
+def test_cornerplot_invalid_diag_mode():
+    samples = {"x": np.random.randn(100)}
+
+    with pytest.raises(ValueError, match="diag_mode"):
+        cornerplot(samples, diag_mode="scatter")
