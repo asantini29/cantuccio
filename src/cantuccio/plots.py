@@ -183,6 +183,14 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
         Maximum violin height in row units (1.0 means adjacent violins touch).
     show_extrema : bool, default True
         If True, draw a thin whisker line spanning the full range of the samples behind each violin.
+    samples2 : dict, np.ndarray or list, optional
+        A second dataset with the **same structure** as `samples` (same chains→rows, same columns). When given, each violin is split: the top half is drawn from `samples` and the bottom half from `samples2` (seaborn-style ``split=True``). Both halves share the row color and are distinguished by shade/hatch.
+    weights2 : np.ndarray or list[np.ndarray], optional
+        Weights for `samples2`, mirroring `weights`.
+    split_labels : tuple[str, str], optional
+        Names for the two cases (e.g. ``("prior", "posterior")``); adds a legend distinguishing the two halves. Only used in split mode.
+    split_kwargs : dict, optional
+        Style overrides for the **bottom** half, forwarded to ``ax.fill_between`` (default ``{"alpha": 0.45}``). Set e.g. ``{"alpha": 0.5, "hatch": "//"}`` to add hatching. The top half always uses ``alpha=0.9``.
     kde_kwargs : dict, optional
         Keyword arguments for the KDE estimation, with the same special keys as :meth:`cantuccio.core.cornerplot` ("bandwidth", "fast", "num_1d"). Remaining entries are forwarded to ``ax.fill_between``.
     truth_kwargs : dict, optional
