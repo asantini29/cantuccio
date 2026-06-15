@@ -122,6 +122,10 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
     colorbar_label: Optional[str] = None,
     violin_width: float = 0.8,
     show_extrema: bool = True,
+    samples2: dict[str, np.ndarray] | np.ndarray | list | None = None,
+    weights2: np.ndarray | list[np.ndarray] | None = None,
+    split_labels: Optional[tuple[str, str] | list[str]] = None,
+    split_kwargs: Optional[dict] = None,
     kde_kwargs: Optional[dict] = None,
     truth_kwargs: Optional[dict] = None,
     fig: Optional[Figure] = None,
@@ -210,8 +214,23 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
     row_colors, mappable = _resolve_row_colors(num_chains, colors, color_by, cmap)
 
     with plt.style.context(stylefile):
+        user_columns = columns  # preserve original before normalization reassigns it
         (_chains, row_colors, _weights, chain_labels, columns, truths, n_dim, num_chains
-        ) = _normalize_inputs(samples, weights, row_colors, labels, columns, plot_delta, truths)
+        ) = _normalize_inputs(samples, weights, row_colors, labels, user_columns, plot_delta, truths)
+
+        split = samples2 is not None
+        _chains2 = _weights2_norm = None
+        if split:
+            (_chains2, _, _weights2_norm, _, _, _, _, num_chains2
+            ) = _normalize_inputs(samples2, weights2, None, labels, user_columns, plot_delta, truths)
+            if num_chains2 != num_chains:
+                raise ValueError(
+                    f"samples2 must have the same number of rows (chains) as samples "
+                    f"({num_chains}), got {num_chains2}"
+                )
+            if split_labels is not None and len(split_labels) != 2:
+                raise ValueError(f"split_labels must have length 2, got {len(split_labels)}")
+        _split_kwargs = {"alpha": 0.45, **dict(split_kwargs or {})}
 
         kde_kwargs = dict(kde_kwargs or {})
         kde_bw = kde_kwargs.pop("bandwidth", "silverman")
@@ -234,29 +253,52 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
             ax = axes[j]
             periodic_bnds = periodic.get(col) if periodic else None
 
+            def _prep(d, wts, _bnds=periodic_bnds):
+                xx, pp = kde_1d(
+                    d, bw=kde_bw, weights=wts, fast=kde_fast,
+                    n=kde_num_1d, periodic=_bnds,
+                )
+                ss = _CREDIBLE_INTERVAL_REGISTRY[statistic](xx, pp, credible_interval)
+                dw = d
+                if _bnds is not None:
+                    low, high = _bnds
+                    dw = low + (d - low) % (high - low)
+                return xx, pp, ss, (dw.min(), dw.max())
+
             for c_idx, (chain_here, color) in enumerate(zip(_chains, row_colors)):
                 y_pos = num_chains - 1 - c_idx  # first chain on top
-                data = chain_here.get(col)
-                if data is None:
+
+                if not split:
+                    data = chain_here.get(col)
+                    if data is None:
+                        continue
+                    x, pdf, stats, whisker = _prep(data, _weights[c_idx])
+                    _draw_violin(
+                        ax, x, pdf, y_pos, pdf.max(), violin_width, color, 0,
+                        kde_kwargs, stats, whisker, show_extrema,
+                    )
                     continue
-                w = _weights[c_idx]
 
-                x, pdf = kde_1d(
-                    data, bw=kde_bw, weights=w, fast=kde_fast,
-                    n=kde_num_1d, periodic=periodic_bnds,
-                )
-                stats = _CREDIBLE_INTERVAL_REGISTRY[statistic](x, pdf, credible_interval)
-
-                whisker_data = data
-                if periodic_bnds is not None:
-                    low, high = periodic_bnds
-                    whisker_data = low + (data - low) % (high - low)
-
-                _draw_violin(
-                    ax, x, pdf, y_pos, pdf.max(), violin_width, color, 0,
-                    kde_kwargs, stats, (whisker_data.min(), whisker_data.max()),
-                    show_extrema,
-                )
+                data = chain_here.get(col)
+                data2 = _chains2[c_idx].get(col)
+                top = _prep(data, _weights[c_idx]) if data is not None else None
+                bot = _prep(data2, _weights2_norm[c_idx]) if data2 is not None else None
+                maxes = [part[1].max() for part in (top, bot) if part is not None]
+                if not maxes:
+                    continue
+                common = max(maxes)
+                if top is not None:
+                    xt, pt, st, wt = top
+                    _draw_violin(
+                        ax, xt, pt, y_pos, common, violin_width, color, 1,
+                        kde_kwargs, st, wt, show_extrema,
+                    )
+                if bot is not None:
+                    xb, pb, sb, wb = bot
+                    _draw_violin(
+                        ax, xb, pb, y_pos, common, violin_width, color, -1,
+                        {**kde_kwargs, **_split_kwargs}, sb, wb, show_extrema,
+                    )
 
             if truths is not None and truths.get(col) is not None:
                 ax.axvline(truths[col], zorder=6, **truth_kwargs)

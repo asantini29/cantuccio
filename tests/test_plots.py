@@ -166,3 +166,49 @@ def test_violinplot_dict_walker_values_flatten():
     walker_chain = {"x": np.random.randn(50, 4), "y": np.random.randn(50, 4)}
     fig, axes = violinplot(walker_chain)
     assert axes.shape == (2,)
+
+
+# ── violinplot split mode ─────────────────────────────────────────────────────
+
+
+def test_violinplot_split_two_dicts():
+    fig, axes = violinplot(_chain(), samples2=_chain(shift=1.0))
+    assert axes.shape == (2,)
+
+
+def test_violinplot_split_multiple_chains_with_weights():
+    a = [_chain(), _chain(shift=1.0), _chain(shift=-1.0)]
+    b = [_chain(shift=0.5), _chain(shift=1.5), _chain(shift=-0.5)]
+    wa = [np.random.uniform(0.1, 1.0, 100) for _ in a]
+    wb = [np.random.uniform(0.1, 1.0, 100) for _ in b]
+    fig, axes = violinplot(a, samples2=b, weights=wa, weights2=wb)
+    assert axes.shape == (2,)
+
+
+def test_violinplot_split_row_count_mismatch_raises():
+    a = [_chain(), _chain(shift=1.0)]
+    b = [_chain()]  # only one row
+    with pytest.raises(ValueError, match="same number of rows"):
+        violinplot(a, samples2=b)
+
+
+def test_violinplot_split_color_by_keeps_colorbar():
+    a = [_chain(), _chain(shift=1.0)]
+    b = [_chain(shift=0.5), _chain(shift=1.5)]
+    fig, axes = violinplot(a, samples2=b, color_by=np.array([10.0, 500.0]))
+    # 2 parameter panels + 1 colorbar axis
+    assert len(fig.axes) == 3
+
+
+def test_violinplot_split_missing_parameter_one_side():
+    a = _chain()
+    b = {"x": np.random.randn(100)}  # no "y" in samples2
+    fig, axes = violinplot(a, samples2=b)
+    assert axes.shape == (2,)
+
+
+def test_violinplot_split_periodic_executes():
+    a = {"phi": np.random.uniform(0, 2 * np.pi, 200)}
+    b = {"phi": np.random.uniform(0, 2 * np.pi, 200)}
+    fig, axes = violinplot(a, samples2=b, periodic={"phi": (0.0, 2 * np.pi)})
+    assert axes.shape == (1,)
