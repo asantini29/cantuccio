@@ -18,6 +18,7 @@ from matplotlib import ticker
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import Normalize, to_rgba
 from matplotlib.figure import Figure
+from matplotlib.patches import Patch
 
 from .core import _CREDIBLE_INTERVAL_REGISTRY, _normalize_inputs
 from .kde import kde_1d
@@ -335,6 +336,23 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
         if mappable is not None:
             fig.colorbar(
                 mappable, ax=axes.tolist(), pad=0.02, label=colorbar_label, aspect=30,
+            )
+
+        if split and split_labels is not None:
+            bottom_patch_kwargs = {
+                k: _split_kwargs[k] for k in ("alpha", "hatch") if k in _split_kwargs
+            }
+            handles = [
+                Patch(facecolor="0.4", edgecolor="0.4", alpha=0.9, label=split_labels[0]),
+                Patch(facecolor="0.4", edgecolor="0.4", label=split_labels[1],
+                      **bottom_patch_kwargs),
+            ]
+            fig.legend(
+                handles=handles,
+                loc="upper right",
+                frameon=False,
+                fancybox=True,
+                fontsize=scale_font(plt.rcParams["legend.fontsize"], num_dim=n_dim),
             )
 
         if savepath is not None:

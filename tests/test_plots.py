@@ -220,3 +220,26 @@ def test_violinplot_split_plot_delta():
     truths = {"x": 0.0, "y": 0.5}
     fig, axes = violinplot(a, samples2=b, truths=truths, plot_delta=True)
     assert axes.shape == (2,)
+
+
+def test_violinplot_split_labels_add_legend():
+    a = [_chain(), _chain(shift=1.0)]
+    b = [_chain(shift=0.5), _chain(shift=1.5)]
+    fig, axes = violinplot(a, samples2=b, split_labels=("prior", "posterior"))
+    assert len(fig.legends) == 1
+    texts = [t.get_text() for t in fig.legends[0].get_texts()]
+    assert texts == ["prior", "posterior"]
+
+
+def test_violinplot_split_labels_wrong_length_raises():
+    a = [_chain()]
+    b = [_chain(shift=1.0)]
+    with pytest.raises(ValueError, match="length 2"):
+        violinplot(a, samples2=b, split_labels=("only-one",))
+
+
+def test_violinplot_split_hatch_executes():
+    a = [_chain()]
+    b = [_chain(shift=1.0)]
+    fig, axes = violinplot(a, samples2=b, split_kwargs={"hatch": "//"})
+    assert axes.shape == (2,)
