@@ -212,3 +212,11 @@ def test_violinplot_split_periodic_executes():
     b = {"phi": np.random.uniform(0, 2 * np.pi, 200)}
     fig, axes = violinplot(a, samples2=b, periodic={"phi": (0.0, 2 * np.pi)})
     assert axes.shape == (1,)
+
+
+def test_violinplot_split_plot_delta():
+    a = [_chain(), _chain(shift=1.0)]
+    b = [_chain(shift=0.5), _chain(shift=1.5)]
+    truths = {"x": 0.0, "y": 0.5}
+    fig, axes = violinplot(a, samples2=b, truths=truths, plot_delta=True)
+    assert axes.shape == (2,)

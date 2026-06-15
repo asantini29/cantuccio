@@ -215,6 +215,7 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
 
     with plt.style.context(stylefile):
         user_columns = columns  # preserve original before normalization reassigns it
+        user_truths = truths    # preserve original before normalization renames delta keys
         (_chains, row_colors, _weights, chain_labels, columns, truths, n_dim, num_chains
         ) = _normalize_inputs(samples, weights, row_colors, labels, user_columns, plot_delta, truths)
 
@@ -222,7 +223,7 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
         _chains2 = _weights2_norm = None
         if split:
             (_chains2, _, _weights2_norm, _, _, _, _, num_chains2
-            ) = _normalize_inputs(samples2, weights2, None, labels, user_columns, plot_delta, truths)
+            ) = _normalize_inputs(samples2, weights2, None, labels, user_columns, plot_delta, user_truths)
             if num_chains2 != num_chains:
                 raise ValueError(
                     f"samples2 must have the same number of rows (chains) as samples "
@@ -230,12 +231,16 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
                 )
             if split_labels is not None and len(split_labels) != 2:
                 raise ValueError(f"split_labels must have length 2, got {len(split_labels)}")
-        _split_kwargs = {"alpha": 0.45, **dict(split_kwargs or {})}
 
         kde_kwargs = dict(kde_kwargs or {})
         kde_bw = kde_kwargs.pop("bandwidth", "silverman")
         kde_fast = kde_kwargs.pop("fast", True)
         kde_num_1d = kde_kwargs.pop("num_1d", 512)
+
+        _split_kwargs = _split_fill_kwargs = None
+        if split:
+            _split_kwargs = {"alpha": 0.45, **dict(split_kwargs or {})}
+            _split_fill_kwargs = {**kde_kwargs, **_split_kwargs}
 
         truth_kwargs = {"color": "k", "ls": "--", "lw": 1.2, **dict(truth_kwargs or {})}
 
@@ -297,7 +302,7 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
                     xb, pb, sb, wb = bot
                     _draw_violin(
                         ax, xb, pb, y_pos, common, violin_width, color, -1,
-                        {**kde_kwargs, **_split_kwargs}, sb, wb, show_extrema,
+                        _split_fill_kwargs, sb, wb, show_extrema,
                     )
 
             if truths is not None and truths.get(col) is not None:
