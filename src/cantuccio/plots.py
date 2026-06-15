@@ -25,7 +25,8 @@ from .visuals import DEFAULT_COLORLIST, get_stylefile, scale_font
 
 # Vertical nudge (in row units) applied to each half's inner stats in split mode,
 # so the top dataset's median/interval sits above the centerline and the bottom's below.
-STAT_OFFSET = 0.12
+_STAT_OFFSET = 0.12
+
 
 def _resolve_row_colors(num_chains, colors, color_by, cmap):
     """Return (per-row color list, ScalarMappable or None) for ``violinplot``."""
@@ -57,8 +58,8 @@ def _draw_violin(ax, x, pdf, y_pos, scale, violin_width, color, side,
     side : int
         ``0`` → symmetric violin filling ``[y_pos - h, y_pos + h]`` with stats on
         the centerline (single-dataset mode). ``+1`` → top half ``[y_pos, y_pos + h]``
-        with stats nudged to ``y_pos + STAT_OFFSET``. ``-1`` → bottom half
-        ``[y_pos - h, y_pos]`` with stats nudged to ``y_pos - STAT_OFFSET``.
+        with stats nudged to ``y_pos + _STAT_OFFSET``. ``-1`` → bottom half
+        ``[y_pos - h, y_pos]`` with stats nudged to ``y_pos - _STAT_OFFSET``.
     scale : float
         Value to normalise ``pdf`` by (the violin reaches ``0.5 * violin_width`` at
         ``pdf == scale``).
@@ -73,9 +74,9 @@ def _draw_violin(ax, x, pdf, y_pos, scale, violin_width, color, side,
     if side == 0:
         y1, y2, stat_y = y_pos - h, y_pos + h, y_pos
     elif side > 0:
-        y1, y2, stat_y = y_pos, y_pos + h, y_pos + STAT_OFFSET
+        y1, y2, stat_y = y_pos, y_pos + h, y_pos + _STAT_OFFSET
     else:
-        y1, y2, stat_y = y_pos - h, y_pos, y_pos - STAT_OFFSET
+        y1, y2, stat_y = y_pos - h, y_pos, y_pos - _STAT_OFFSET
 
     if show_extrema:
         ax.plot(
