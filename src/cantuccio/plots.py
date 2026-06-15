@@ -23,6 +23,10 @@ from .core import _CREDIBLE_INTERVAL_REGISTRY, _normalize_inputs
 from .kde import kde_1d
 from .visuals import DEFAULT_COLORLIST, get_stylefile, scale_font
 
+# Vertical nudge (in row units) applied to each half's inner stats in split mode,
+# so the top dataset's median/interval sits above the centerline and the bottom's below.
+STAT_OFFSET = 0.12
+
 def _resolve_row_colors(num_chains, colors, color_by, cmap):
     """Return (per-row color list, ScalarMappable or None) for ``violinplot``."""
     if color_by is not None:
@@ -42,6 +46,63 @@ def _resolve_row_colors(num_chains, colors, color_by, cmap):
     elif isinstance(colors, str):
         colors = [colors]
     return list(colors), None
+
+
+def _draw_violin(ax, x, pdf, y_pos, scale, violin_width, color, side,
+                 fill_kwargs, stats, whisker_range, show_extrema):
+    """Draw one violin shape plus its inner stats on ``ax``.
+
+    Parameters
+    ----------
+    side : int
+        ``0`` → symmetric violin filling ``[y_pos - h, y_pos + h]`` with stats on
+        the centerline (single-dataset mode). ``+1`` → top half ``[y_pos, y_pos + h]``
+        with stats nudged to ``y_pos + STAT_OFFSET``. ``-1`` → bottom half
+        ``[y_pos - h, y_pos]`` with stats nudged to ``y_pos - STAT_OFFSET``.
+    scale : float
+        Value to normalise ``pdf`` by (the violin reaches ``0.5 * violin_width`` at
+        ``pdf == scale``).
+    stats : tuple[float, float, float]
+        ``(lo, med, hi)`` for the interval bar and median dot.
+    whisker_range : tuple[float, float]
+        ``(min, max)`` of the (periodic-wrapped) data for the whisker line.
+    """
+    h = 0.5 * violin_width * pdf / scale
+    r, g, b, _ = to_rgba(color)
+
+    if side == 0:
+        y1, y2, stat_y = y_pos - h, y_pos + h, y_pos
+    elif side > 0:
+        y1, y2, stat_y = y_pos, y_pos + h, y_pos + STAT_OFFSET
+    else:
+        y1, y2, stat_y = y_pos - h, y_pos, y_pos - STAT_OFFSET
+
+    if show_extrema:
+        ax.plot(
+            [whisker_range[0], whisker_range[1]], [stat_y, stat_y],
+            color="k", lw=0.6, alpha=0.6, zorder=2,
+        )
+
+    ax.fill_between(
+        x, y1, y2,
+        **{
+            "facecolor": (r, g, b, 0.9),
+            "edgecolor": (r, g, b, 1.0),
+            "lw": 0.8,
+            "zorder": 3,
+            **fill_kwargs,
+        },
+    )
+
+    lo, med, hi = stats
+    ax.plot(
+        [lo, hi], [stat_y, stat_y],
+        color="k", lw=2.5, alpha=0.8, solid_capstyle="round", zorder=4,
+    )
+    ax.plot(
+        med, stat_y, marker="o", ms=3.5, mfc="w", mec="k", mew=0.6,
+        ls="none", zorder=5,
+    )
 
 
 def violinplot(  # pylint: disable=too-many-branches too-many-statements too-many-arguments too-many-locals
@@ -180,51 +241,20 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
                 w = _weights[c_idx]
 
                 x, pdf = kde_1d(
-                    data,
-                    bw=kde_bw,
-                    weights=w,
-                    fast=kde_fast,
-                    n=kde_num_1d,
-                    periodic=periodic_bnds,
+                    data, bw=kde_bw, weights=w, fast=kde_fast,
+                    n=kde_num_1d, periodic=periodic_bnds,
                 )
-                lo, med, hi = _CREDIBLE_INTERVAL_REGISTRY[statistic](x, pdf, credible_interval)
+                stats = _CREDIBLE_INTERVAL_REGISTRY[statistic](x, pdf, credible_interval)
 
-                if show_extrema:
-                    whisker_data = data
-                    if periodic_bnds is not None:
-                        low, high = periodic_bnds
-                        whisker_data = low + (data - low) % (high - low)
-                    ax.plot(
-                        [whisker_data.min(), whisker_data.max()],
-                        [y_pos, y_pos],
-                        color="k",
-                        lw=0.6,
-                        alpha=0.6,
-                        zorder=2,
-                    )
+                whisker_data = data
+                if periodic_bnds is not None:
+                    low, high = periodic_bnds
+                    whisker_data = low + (data - low) % (high - low)
 
-                h = 0.5 * violin_width * pdf / pdf.max()
-                r, g, b, _ = to_rgba(color)
-                ax.fill_between(
-                    x,
-                    y_pos - h,
-                    y_pos + h,
-                    **{
-                        "facecolor": (r, g, b, 0.9),
-                        "edgecolor": (r, g, b, 1.0),
-                        "lw": 0.8,
-                        "zorder": 3,
-                        **kde_kwargs,
-                    },
-                )
-
-                ax.plot(
-                    [lo, hi], [y_pos, y_pos],
-                    color="k", lw=2.5, alpha=0.8, solid_capstyle="round", zorder=4,
-                )
-                ax.plot(
-                    med, y_pos, marker="o", ms=3.5, mfc="w", mec="k", mew=0.6,
-                    ls="none", zorder=5,
+                _draw_violin(
+                    ax, x, pdf, y_pos, pdf.max(), violin_width, color, 0,
+                    kde_kwargs, stats, (whisker_data.min(), whisker_data.max()),
+                    show_extrema,
                 )
 
             if truths is not None and truths.get(col) is not None:
