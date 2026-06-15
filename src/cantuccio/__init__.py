@@ -4,8 +4,9 @@ Cantuccio - Yet another corner plot package. The sweetest one around.
 
 from importlib.metadata import PackageNotFoundError, version
 
-from . import core, kde, visuals
+from . import core, kde, plots, visuals
 from .core import cornerplot, overplot_lines, get_credible_interval
+from .plots import violinplot, traceplot
 
 __copyright__ = "2026, Alessandro Santini"
 __author__ = "Alessandro Santini"

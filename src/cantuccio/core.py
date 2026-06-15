@@ -897,6 +897,21 @@ def _normalize_inputs(samples, weights, colors, labels, columns, plot_delta, tru
 
     num_chains = len(samples)
 
+    # Flatten the walker axis where present. By convention the last axis of an
+    # array is always the parameter axis, so a 3D array is (nsteps, nwalkers,
+    # ndim) and a 2D dict value is (nsteps, nwalkers).
+    flattened = []
+    for chain in samples:
+        if isinstance(chain, dict):
+            flattened.append(
+                {k: (v.ravel() if getattr(v, "ndim", 1) > 1 else v) for k, v in chain.items()}
+            )
+        elif getattr(chain, "ndim", 0) == 3:
+            flattened.append(chain.reshape(-1, chain.shape[-1]))
+        else:
+            flattened.append(chain)
+    samples = flattened
+
     if not isinstance(samples[0], dict):
         num_dim = samples[0].shape[1]
         parameter_labels = [r"$\theta_{" + str(i) + "}$" for i in range(num_dim)]
@@ -1014,6 +1029,17 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
     ----------
     samples : dict[str, np.ndarray], np.ndarray or list[dict[str, np.ndarray] | np.ndarray]
         A single chain or a list of chains, where each dict maps parameter names to samples. If `np.ndarrays` are provided instead of dictionaries, the parameters will be labelled as :math:`\\theta_i`.
+
+        The last axis of an array is **always** the parameter/dimension axis; the dict counterpart of an array moves that axis into the keys (one key per dimension), so dict values have exactly one axis fewer:
+
+        ============================== ============================ =====================
+        Array form                     Dict counterpart (per key)   Meaning
+        ============================== ============================ =====================
+        ``(nsteps, ndim)``             ``(nsteps,)``                flat chain
+        ``(nsteps, nwalkers, ndim)``   ``(nsteps, nwalkers)``       walker-resolved chain
+        ============================== ============================ =====================
+
+        Walker-resolved inputs are flattened over the walker axis before plotting. If `weights` are given for a walker-resolved chain, they must already be flat with length ``nsteps * nwalkers``.
     columns : list[str], optional
         List of parameter names to include in the plot. If None, all keys from the first chain will be used.
     weights : np.ndarray or list[np.ndarray], optional
