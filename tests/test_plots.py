@@ -248,3 +248,14 @@ def test_violinplot_split_hatch_executes():
     # the bottom-half legend patch carries the hatch
     bottom_handle = fig.legends[0].legend_handles[1]
     assert bottom_handle.get_hatch() == "//"
+
+
+def test_violinplot_split_half_fills_have_distinct_alpha():
+    # A single split chain with one parameter should produce exactly two fills:
+    # the top half (alpha 0.9) and the bottom half (alpha 0.45).
+    fig, axes = violinplot({"x": np.random.randn(200)},
+                           samples2={"x": np.random.randn(200) + 1.0})
+    fills = axes[0].collections
+    assert len(fills) == 2
+    alphas = sorted(float(f.get_facecolor()[0][3]) for f in fills)
+    assert alphas == pytest.approx([0.45, 0.9])
