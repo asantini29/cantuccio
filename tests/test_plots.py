@@ -241,5 +241,10 @@ def test_violinplot_split_labels_wrong_length_raises():
 def test_violinplot_split_hatch_executes():
     a = [_chain()]
     b = [_chain(shift=1.0)]
-    fig, axes = violinplot(a, samples2=b, split_kwargs={"hatch": "//"})
+    fig, axes = violinplot(
+        a, samples2=b, split_kwargs={"hatch": "//"}, split_labels=("a", "b")
+    )
     assert axes.shape == (2,)
+    # the bottom-half legend patch carries the hatch
+    bottom_handle = fig.legends[0].legend_handles[1]
+    assert bottom_handle.get_hatch() == "//"

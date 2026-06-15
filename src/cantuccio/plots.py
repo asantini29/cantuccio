@@ -349,9 +349,10 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
             ]
             fig.legend(
                 handles=handles,
-                loc="upper right",
+                loc="lower center",
+                bbox_to_anchor=(0.5, 1.0),
+                ncol=2,
                 frameon=False,
-                fancybox=True,
                 fontsize=scale_font(plt.rcParams["legend.fontsize"], num_dim=n_dim),
             )
 
