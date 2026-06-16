@@ -10,6 +10,7 @@ traceplot(samples, ...)   ->  (fig, axes)
 
 from __future__ import annotations
 
+import colorsys
 from typing import Optional
 
 import numpy as np
@@ -27,6 +28,21 @@ from .visuals import DEFAULT_COLORLIST, get_stylefile, scale_font
 # Vertical nudge (in row units) applied to each half's inner stats in split mode,
 # so the top dataset's median/interval sits above the centerline and the bottom's below.
 _STAT_OFFSET = 0.12
+
+# Lightness multiplier (in HLS space) for the violin outline relative to its fill.
+_EDGE_DARKEN = 0.6
+
+
+def _darken(color, factor=_EDGE_DARKEN):
+    """Return ``color`` as a darker, fully opaque shade by scaling its HLS lightness.
+
+    Used for violin outlines so that very light fills (e.g. the pale end of a
+    colormap such as ``Blues``) still get a visible edge.
+    """
+    r, g, b, _ = to_rgba(color)
+    h, l, s = colorsys.rgb_to_hls(r, g, b)
+    r, g, b = colorsys.hls_to_rgb(h, l * factor, s)
+    return (r, g, b, 1.0)
 
 
 def _resolve_row_colors(num_chains, colors, color_by, cmap):
@@ -89,8 +105,8 @@ def _draw_violin(ax, x, pdf, y_pos, scale, violin_width, color, side,
         x, y1, y2,
         **{
             "facecolor": (r, g, b, 0.9),
-            "edgecolor": (r, g, b, 1.0),
-            "lw": 0.8,
+            "edgecolor": _darken((r, g, b)),
+            "lw": 1.3,
             "zorder": 3,
             **fill_kwargs,
         },
@@ -343,7 +359,7 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
 
         if mappable is not None:
             fig.colorbar(
-                mappable, ax=axes.tolist(), pad=0.02, label=colorbar_label, aspect=30,
+                mappable, ax=axes.tolist(), pad=0.02, label=colorbar_label, aspect=15,
             )
 
         if split and split_labels is not None:
