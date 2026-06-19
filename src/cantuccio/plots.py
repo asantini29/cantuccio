@@ -66,7 +66,7 @@ def _resolve_row_colors(num_chains, colors, color_by, cmap):
     return list(colors), None
 
 
-def _draw_violin(ax, x, pdf, y_pos, scale, violin_width, color, side,
+def _draw_violin(ax, x, pdf, y_pos, scale, violin_width, color, edge_color, side,
                  fill_kwargs, stats, whisker_range, show_extrema):
     """Draw one violin shape plus its inner stats on ``ax``.
 
@@ -101,11 +101,13 @@ def _draw_violin(ax, x, pdf, y_pos, scale, violin_width, color, side,
             color="k", lw=0.6, alpha=0.6, zorder=2,
         )
 
+    edge_color = edge_color or (r, g, b, 0.9)
+
     ax.fill_between(
         x, y1, y2,
         **{
             "facecolor": (r, g, b, 0.9),
-            "edgecolor": _darken((r, g, b)),
+            "edgecolor": edge_color,
             "lw": 1.3,
             "zorder": 3,
             **fill_kwargs,
@@ -136,6 +138,7 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
     colors: Optional[list[str]] = None,
     color_by: Optional[np.ndarray] = None,
     cmap: str = "plasma",
+    edge_color: Optional[str] = None,
     colorbar_label: Optional[str] = None,
     violin_width: float = 0.8,
     show_extrema: bool = True,
@@ -304,7 +307,7 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
                         continue
                     x, pdf, stats, whisker = _prep(data, _weights[c_idx])
                     _draw_violin(
-                        ax, x, pdf, y_pos, pdf.max(), violin_width, color, 0,
+                        ax, x, pdf, y_pos, pdf.max(), violin_width, color, edge_color, 0,
                         kde_kwargs, stats, whisker, show_extrema,
                     )
                     continue
@@ -320,13 +323,13 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
                 if top is not None:
                     xt, pt, st, wt = top
                     _draw_violin(
-                        ax, xt, pt, y_pos, common, violin_width, color, 1,
+                        ax, xt, pt, y_pos, common, violin_width, color, edge_color, 1,
                         kde_kwargs, st, wt, show_extrema,
                     )
                 if bot is not None:
                     xb, pb, sb, wb = bot
                     _draw_violin(
-                        ax, xb, pb, y_pos, common, violin_width, color, -1,
+                        ax, xb, pb, y_pos, common, violin_width, color, edge_color, -1,
                         _split_fill_kwargs, sb, wb, show_extrema,
                     )
 
@@ -589,7 +592,7 @@ def traceplot(  # pylint: disable=too-many-branches too-many-statements too-many
                     window = min(rolling_window, nsteps)
                     mean = data.mean(axis=1)
                     smoothed = np.convolve(mean, np.ones(window) / window, mode="valid")
-                    ax.plot(steps[window - 1:], smoothed, color=color, lw=1.5, zorder=4)
+                    ax.plot(steps[window - 1:], smoothed, color=color, lw=2, zorder=4)
 
             if burn is not None and burn > 0:
                 ax.axvspan(0, burn, color="0.5", alpha=0.15, zorder=0)

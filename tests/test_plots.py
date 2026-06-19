@@ -259,3 +259,15 @@ def test_violinplot_split_half_fills_have_distinct_alpha():
     assert len(fills) == 2
     alphas = sorted(float(f.get_facecolor()[0][3]) for f in fills)
     assert alphas == pytest.approx([0.45, 0.9])
+
+
+def test_violinplot_edge_is_darker_than_fill():
+    # A very light fill should still get a visibly darker outline (a darker shade
+    # of the fill colour, not the same hue at full alpha).
+    fig, axes = violinplot({"x": np.random.randn(200)}, colors=["#cfe8ff"])
+    fill = axes[0].collections[0]
+    face_rgb = fill.get_facecolor()[0][:3]
+    edge_rgb = fill.get_edgecolor()[0][:3]
+    # darker shade: every channel no lighter, and overall strictly darker
+    assert all(e <= f + 1e-9 for e, f in zip(edge_rgb, face_rgb))
+    assert sum(edge_rgb) < sum(face_rgb)
