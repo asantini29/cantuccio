@@ -1,13 +1,17 @@
-"""Tests for the 7 private helpers from cantuccio.core."""
+"""Tests for the private helpers behind the plots.
+
+``_normalize_inputs`` is the shared engine and lives in ``cantuccio.core``; the
+corner-specific helpers live in ``cantuccio.corner``.
+"""
 import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-import cantuccio.core as core
-from cantuccio.core import (
-    _normalize_inputs,
+import cantuccio.corner as cornerplot_mod
+from cantuccio.core import _normalize_inputs
+from cantuccio.corner import (
     _resolve_plot_config,
     _setup_figure,
     _sync_axes,
@@ -183,7 +187,7 @@ def test_plot_diagonal_hist_mode_does_not_call_kde_1d(monkeypatch):
     def fail(*a, **kw):
         raise AssertionError("kde_1d must not be called in hist mode")
 
-    monkeypatch.setattr(core, "kde_1d", fail)
+    monkeypatch.setattr(cornerplot_mod, "kde_1d", fail)
     _plot_diagonal(
         axes, _chains, colors, _weights, columns, n_dim, periodic=None,
         diag_mode="hist", credible_interval=0.9, statistic="hdi", base_mode=base_mode,

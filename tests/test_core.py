@@ -1,8 +1,9 @@
 import numpy as np
 import pytest
 
-import cantuccio.core as core
-from cantuccio.core import get_credible_interval, cornerplot
+import cantuccio.corner as cornerplot_mod
+from cantuccio.core import get_credible_interval
+from cantuccio.corner import cornerplot
 
 
 def test_credible_interval_unweighted():
@@ -93,7 +94,7 @@ def test_cornerplot_hist_diag_do_not_use_kde(monkeypatch):
     def fail_if_called(*args, **kwargs):
         raise AssertionError("kde_1d should not be called when diag_mode='hist'")
 
-    monkeypatch.setattr(core, "kde_1d", fail_if_called)
+    monkeypatch.setattr(cornerplot_mod, "kde_1d", fail_if_called)
 
     samples = {"x": np.random.randn(100)}
     fig, axes = cornerplot(samples, diag_mode="hist")
