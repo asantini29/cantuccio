@@ -1,0 +1,373 @@
+"""
+violin.py
+=========
+
+Horizontal violin plots of posterior samples.
+
+violinplot(samples, ...)  ->  (fig, axes)
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+import numpy as np
+from matplotlib import pyplot as plt
+from matplotlib import ticker
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import Normalize, to_rgba
+from matplotlib.figure import Figure
+from matplotlib.patches import Patch
+
+from .core import _CREDIBLE_INTERVAL_REGISTRY, _normalize_inputs
+from .kde import kde_1d
+from .visuals import DEFAULT_COLORLIST, get_stylefile, scale_font
+
+# Vertical nudge (in row units) applied to each half's inner stats in split mode,
+# so the top dataset's median/interval sits above the centerline and the bottom's below.
+_STAT_OFFSET = 0.12
+
+
+def _resolve_row_colors(num_chains, colors, color_by, cmap):
+    """Return (per-row color list, ScalarMappable or None) for ``violinplot``."""
+    if color_by is not None:
+        if colors is not None:
+            raise ValueError("Provide either `colors` or `color_by`, not both")
+        color_by = np.asarray(color_by, dtype=float)
+        if color_by.shape != (num_chains,):
+            raise ValueError(
+                f"color_by must have one scalar per chain ({num_chains}), got shape {color_by.shape}"
+            )
+        norm = Normalize(vmin=np.nanmin(color_by), vmax=np.nanmax(color_by))
+        mappable = ScalarMappable(norm=norm, cmap=plt.get_cmap(cmap))
+        return [mappable.to_rgba(v) for v in color_by], mappable
+
+    if colors is None:
+        colors = [DEFAULT_COLORLIST[c % len(DEFAULT_COLORLIST)] for c in range(num_chains)]
+    elif isinstance(colors, str):
+        colors = [colors]
+    return list(colors), None
+
+
+def _draw_violin(ax, x, pdf, y_pos, scale, violin_width, color, edge_color, side,
+                 fill_kwargs, stats, whisker_range, show_extrema):
+    """Draw one violin shape plus its inner stats on ``ax``.
+
+    Parameters
+    ----------
+    side : int
+        ``0`` → symmetric violin filling ``[y_pos - h, y_pos + h]`` with stats on
+        the centerline (single-dataset mode). ``+1`` → top half ``[y_pos, y_pos + h]``
+        with stats nudged to ``y_pos + _STAT_OFFSET``. ``-1`` → bottom half
+        ``[y_pos - h, y_pos]`` with stats nudged to ``y_pos - _STAT_OFFSET``.
+    scale : float
+        Value to normalise ``pdf`` by (the violin reaches ``0.5 * violin_width`` at
+        ``pdf == scale``).
+    stats : tuple[float, float, float]
+        ``(lo, med, hi)`` for the interval bar and median dot.
+    whisker_range : tuple[float, float]
+        ``(min, max)`` of the (periodic-wrapped) data for the whisker line.
+    """
+    h = 0.5 * violin_width * pdf / scale
+    r, g, b, _ = to_rgba(color)
+
+    if side == 0:
+        y1, y2, stat_y = y_pos - h, y_pos + h, y_pos
+    elif side > 0:
+        y1, y2, stat_y = y_pos, y_pos + h, y_pos + _STAT_OFFSET
+    else:
+        y1, y2, stat_y = y_pos - h, y_pos, y_pos - _STAT_OFFSET
+
+    if show_extrema:
+        ax.plot(
+            [whisker_range[0], whisker_range[1]], [stat_y, stat_y],
+            color="k", lw=0.6, alpha=0.6, zorder=2,
+        )
+
+    edge_color = edge_color or (r, g, b, 0.9)
+
+    ax.fill_between(
+        x, y1, y2,
+        **{
+            "facecolor": (r, g, b, 0.9),
+            "edgecolor": edge_color,
+            "lw": 1.3,
+            "zorder": 3,
+            **fill_kwargs,
+        },
+    )
+
+    lo, med, hi = stats
+    ax.plot(
+        [lo, hi], [stat_y, stat_y],
+        color="k", lw=2.5, alpha=0.8, solid_capstyle="round", zorder=4,
+    )
+    ax.plot(
+        med, stat_y, marker="o", ms=3.5, mfc="w", mec="k", mew=0.6,
+        ls="none", zorder=5,
+    )
+
+
+def violinplot(  # pylint: disable=too-many-branches too-many-statements too-many-arguments too-many-locals
+    samples: dict[str, np.ndarray] | np.ndarray | list[dict[str, np.ndarray] | np.ndarray],
+    columns: list[str] | None = None,
+    weights: np.ndarray | list[np.ndarray] | None = None,
+    truths: Optional[dict | np.ndarray] = None,
+    plot_delta: bool = False,
+    periodic: Optional[dict[str, tuple[float, float]]] = None,
+    credible_interval: float = 0.90,
+    statistic: str = "median",
+    labels: Optional[str | list[str]] = None,
+    colors: Optional[list[str]] = None,
+    color_by: Optional[np.ndarray] = None,
+    cmap: str = "plasma",
+    edge_color: Optional[str] = None,
+    colorbar_label: Optional[str] = None,
+    violin_width: float = 0.8,
+    show_extrema: bool = True,
+    samples2: dict[str, np.ndarray] | np.ndarray | list | None = None,
+    weights2: np.ndarray | list[np.ndarray] | None = None,
+    split_labels: Optional[tuple[str, str] | list[str]] = None,
+    split_kwargs: Optional[dict] = None,
+    kde_kwargs: Optional[dict] = None,
+    truth_kwargs: Optional[dict] = None,
+    fig: Optional[Figure] = None,
+    axes: Optional[np.ndarray] = None,
+    n_ticks: int = 4,
+    stylefile: str | None = None,
+    savepath: str | None = None,
+) -> tuple[Figure, np.ndarray]:
+    """
+    Horizontal violin plot of posterior samples: one row per chain, one panel per parameter.
+
+    Each violin is built from the same 1D KDE machinery used by :meth:`cantuccio.corner.cornerplot` (weights and periodic parameters are supported), and is annotated with a thick credible-interval bar, a white median dot, and an optional thin whisker line spanning the full sample range.
+
+    Parameters
+    ----------
+    samples : dict[str, np.ndarray], np.ndarray or list[dict[str, np.ndarray] | np.ndarray]
+        A single chain or a list of chains; **each chain becomes one row** of the plot. Each dict maps parameter names to samples. If `np.ndarrays` are provided instead of dictionaries, the parameters will be labelled as :math:`\\theta_i`.
+
+        The last axis of an array is **always** the parameter/dimension axis; the dict counterpart of an array moves that axis into the keys (one key per dimension), so dict values have exactly one axis fewer:
+
+        ============================== ============================ =====================
+        Array form                     Dict counterpart (per key)   Meaning
+        ============================== ============================ =====================
+        ``(nsteps, ndim)``             ``(nsteps,)``                flat chain
+        ``(nsteps, nwalkers, ndim)``   ``(nsteps, nwalkers)``       walker-resolved chain
+        ============================== ============================ =====================
+
+        Walker-resolved inputs are flattened over the walker axis before plotting.
+    columns : list[str], optional
+        List of parameter names to include in the plot. If None, the union of keys across chains will be used.
+    weights : np.ndarray or list[np.ndarray], optional
+        A single array of weights or a list of arrays of weights corresponding to the chains. If None, samples will be treated as unweighted.
+    truths : dict or np.ndarray, optional
+        Dictionary or array mapping parameter names to their true values, drawn as vertical lines on each panel. If a numpy array is provided, it will be matched to the parameters in order of `columns`.
+    plot_delta : bool, default False
+        If True, plot the difference between the samples and the truths (i.e., Δ = samples - truths) instead of the raw samples. Requires `truths` to be provided.
+    periodic : dict[str, tuple[float, float]], optional
+        Dictionary mapping parameter names to their wrapped domain boundaries (e.g., {"phi": (0, 2 * np.pi)}). The violin KDE correctly folds and wraps inside this topology.
+    credible_interval : float, default 0.90
+        Credible interval level for the thick bar inside each violin.
+    statistic : str, default "median"
+        Statistic used for the interval bar and the central dot. Options are "median" or "hdi", as in :meth:`cantuccio.corner.cornerplot`.
+    labels : str or list[str], optional
+        Row labels for the chains (shown as y tick labels on the leftmost panel).
+    colors : list[str], optional
+        List of colors, one per chain/row. If not provided, the default color list is cycled. Mutually exclusive with `color_by`.
+    color_by : np.ndarray, optional
+        One scalar per chain/row (e.g. SNR). Violin fills are mapped through `cmap` and a colorbar is added to the figure. Mutually exclusive with `colors`.
+    cmap : str, default "plasma"
+        Colormap used with `color_by`.
+    edge_color : str, optional
+        Color for the violin outline. If None, a darker shade of each violin's fill color is used.
+    colorbar_label : str, optional
+        Label for the colorbar created when `color_by` is given.
+    violin_width : float, default 0.8
+        Maximum violin height in row units (1.0 means adjacent violins touch).
+    show_extrema : bool, default True
+        If True, draw a thin whisker line spanning the full range of the samples behind each violin.
+    samples2 : dict, np.ndarray or list, optional
+        A second dataset with the **same structure** as `samples` (same chains→rows, same columns). When given, each violin is split: the top half is drawn from `samples` and the bottom half from `samples2` (seaborn-style ``split=True``). Both halves share the row color and are distinguished by shade/hatch.
+    weights2 : np.ndarray or list[np.ndarray], optional
+        Weights for `samples2`, mirroring `weights`.
+    split_labels : tuple[str, str], optional
+        Names for the two cases (e.g. ``("prior", "posterior")``); adds a legend distinguishing the two halves. Only used in split mode.
+    split_kwargs : dict, optional
+        Style overrides for the **bottom** half, forwarded to ``ax.fill_between`` (default ``{"alpha": 0.45}``). Set e.g. ``{"alpha": 0.5, "hatch": "//"}`` to add hatching. The top half always uses ``alpha=0.9``.
+    kde_kwargs : dict, optional
+        Keyword arguments for the KDE estimation, with the same special keys as :meth:`cantuccio.corner.cornerplot` ("bandwidth", "fast", "num_1d"). Remaining entries are forwarded to ``ax.fill_between``.
+    truth_kwargs : dict, optional
+        Keyword arguments for the truth lines.
+    fig : matplotlib.figure.Figure, optional
+        Matplotlib Figure object to use for the plot. If None, a new figure will be created.
+    axes : np.ndarray, optional
+        Array of matplotlib Axes objects of length ``n_dim``. If None, a new set of axes will be created.
+    n_ticks : int, default 4
+        Number of ticks to show on each x-axis.
+    stylefile : str, optional
+        Path to a Matplotlib style file to use for the plot. If None, a default style file included with the package will be used.
+    savepath : str, optional
+        Path to save the figure. If None, the figure will not be saved.
+
+    Returns
+    -------
+    tuple[matplotlib.figure.Figure, np.ndarray]
+        The figure and the array of axes (shape ``(n_dim,)``).
+    """
+    if stylefile is None:
+        stylefile = get_stylefile()
+
+    if statistic not in _CREDIBLE_INTERVAL_REGISTRY:
+        raise ValueError(
+            f"Invalid statistic {statistic!r}. Supported options are: {list(_CREDIBLE_INTERVAL_REGISTRY.keys())}"
+        )
+
+    num_chains = len(samples) if isinstance(samples, list) else 1
+    row_colors, mappable = _resolve_row_colors(num_chains, colors, color_by, cmap)
+
+    with plt.style.context(stylefile):
+        user_columns = columns  # preserve original before normalization reassigns it
+        user_truths = truths    # preserve original before normalization renames delta keys
+        (_chains, row_colors, _weights, chain_labels, columns, truths, n_dim, num_chains
+        ) = _normalize_inputs(samples, weights, row_colors, labels, user_columns, plot_delta, truths)
+
+        split = samples2 is not None
+        _chains2 = _weights2_norm = None
+        if split:
+            (_chains2, _, _weights2_norm, _, _, _, _, num_chains2
+            ) = _normalize_inputs(samples2, weights2, None, labels, user_columns, plot_delta, user_truths)
+            if num_chains2 != num_chains:
+                raise ValueError(
+                    f"samples2 must have the same number of rows (chains) as samples "
+                    f"({num_chains}), got {num_chains2}"
+                )
+            if split_labels is not None and len(split_labels) != 2:
+                raise ValueError(f"split_labels must have length 2, got {len(split_labels)}")
+
+        kde_kwargs = dict(kde_kwargs or {})
+        kde_bw = kde_kwargs.pop("bandwidth", "silverman")
+        kde_fast = kde_kwargs.pop("fast", True)
+        kde_num_1d = kde_kwargs.pop("num_1d", 512)
+
+        _split_kwargs = _split_fill_kwargs = None
+        if split:
+            _split_kwargs = {"alpha": 0.45, **dict(split_kwargs or {})}
+            _split_fill_kwargs = {**kde_kwargs, **_split_kwargs}
+
+        truth_kwargs = {"color": "k", "ls": "--", "lw": 1.2, **dict(truth_kwargs or {})}
+
+        if fig is None or axes is None:
+            figsize = (2.0 * n_dim, max(2.0, 0.5 * num_chains + 1.2))
+            fig, axes = plt.subplots(1, n_dim, figsize=figsize, sharey=True, squeeze=False)
+        axes = np.atleast_1d(np.asarray(axes)).ravel()
+        if axes.size != n_dim:
+            raise ValueError(f"axes must have length {n_dim}, got {axes.size}")
+
+        label_fontsize = scale_font(plt.rcParams["axes.labelsize"], n_dim)
+        tick_labelsize = scale_font(plt.rcParams["xtick.labelsize"], n_dim)
+
+        for j, col in enumerate(columns):
+            ax = axes[j]
+            periodic_bnds = periodic.get(col) if periodic else None
+
+            def _prep(d, wts, _bnds=periodic_bnds):
+                xx, pp = kde_1d(
+                    d, bw=kde_bw, weights=wts, fast=kde_fast,
+                    n=kde_num_1d, periodic=_bnds,
+                )
+                ss = _CREDIBLE_INTERVAL_REGISTRY[statistic](xx, pp, credible_interval)
+                dw = d
+                if _bnds is not None:
+                    low, high = _bnds
+                    dw = low + (d - low) % (high - low)
+                return xx, pp, ss, (dw.min(), dw.max())
+
+            for c_idx, (chain_here, color) in enumerate(zip(_chains, row_colors)):
+                y_pos = num_chains - 1 - c_idx  # first chain on top
+
+                if not split:
+                    data = chain_here.get(col)
+                    if data is None:
+                        continue
+                    x, pdf, stats, whisker = _prep(data, _weights[c_idx])
+                    _draw_violin(
+                        ax, x, pdf, y_pos, pdf.max(), violin_width, color, edge_color, 0,
+                        kde_kwargs, stats, whisker, show_extrema,
+                    )
+                    continue
+
+                data = chain_here.get(col)
+                data2 = _chains2[c_idx].get(col)
+                top = _prep(data, _weights[c_idx]) if data is not None else None
+                bot = _prep(data2, _weights2_norm[c_idx]) if data2 is not None else None
+                maxes = [part[1].max() for part in (top, bot) if part is not None]
+                if not maxes:
+                    continue
+                common = max(maxes)
+                if top is not None:
+                    xt, pt, st, wt = top
+                    _draw_violin(
+                        ax, xt, pt, y_pos, common, violin_width, color, edge_color, 1,
+                        kde_kwargs, st, wt, show_extrema,
+                    )
+                if bot is not None:
+                    xb, pb, sb, wb = bot
+                    _draw_violin(
+                        ax, xb, pb, y_pos, common, violin_width, color, edge_color, -1,
+                        _split_fill_kwargs, sb, wb, show_extrema,
+                    )
+
+            if truths is not None and truths.get(col) is not None:
+                ax.axvline(truths[col], zorder=6, **truth_kwargs)
+
+            ax.set_xlabel(col, fontsize=label_fontsize)
+            ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=True))
+            ax.xaxis.offsetText.set_fontsize(tick_labelsize)
+            ax.xaxis.set_major_locator(
+                ticker.MaxNLocator(nbins=n_ticks - 1, prune=None, min_n_ticks=n_ticks)
+            )
+
+            ax.set_ylim(-0.7, num_chains - 0.3)
+            ax.set_yticks(range(num_chains))
+            if j == 0:
+                if chain_labels is not None:
+                    # tick at y position num_chains - 1 - c belongs to chain c
+                    ax.set_yticklabels(chain_labels[::-1])
+                else:
+                    ax.set_yticklabels([])
+            else:
+                # hide labels without touching the (possibly shared) formatter
+                ax.tick_params(labelleft=False)
+            ax.tick_params(labelsize=tick_labelsize)
+            ax.tick_params(axis="y", direction=plt.rcParams["xtick.direction"])
+
+        fig.align_labels()
+        fig.tight_layout()
+
+        if mappable is not None:
+            fig.colorbar(
+                mappable, ax=axes.tolist(), pad=0.02, label=colorbar_label, aspect=15,
+            )
+
+        if split and split_labels is not None:
+            bottom_patch_kwargs = {
+                k: _split_kwargs[k] for k in ("alpha", "hatch") if k in _split_kwargs
+            }
+            handles = [
+                Patch(facecolor="0.4", edgecolor="0.4", alpha=0.9, label=split_labels[0]),
+                Patch(facecolor="0.4", edgecolor="0.4", label=split_labels[1],
+                      **bottom_patch_kwargs),
+            ]
+            fig.legend(
+                handles=handles,
+                loc="lower center",
+                bbox_to_anchor=(0.5, 1.0),
+                ncol=2,
+                frameon=False,
+                fontsize=scale_font(plt.rcParams["legend.fontsize"], num_dim=n_dim),
+            )
+
+        if savepath is not None:
+            plt.savefig(savepath)
+        return fig, axes

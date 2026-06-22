@@ -20,6 +20,7 @@ dev = [
     "mypy>=2.0.0",
 ]
 docs = [
+    "ipython>=8.18.0",  # provides the ipython3 Pygments lexer for tutorial notebook cells
     "marimo>=0.23.5",
     "myst-parser>=5.1.0",
     "nbsphinx>=0.9.8",

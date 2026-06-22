@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Figures dumped by the test suite (CANTUCCIO_FIG_DIR)
+tests/_figures/
