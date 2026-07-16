@@ -28,8 +28,8 @@ from cantuccio.corner import (
 def test_normalize_inputs_single_chain_coercion():
     np.random.seed(42)
     samples = {"x": np.random.randn(50)}
-    _chains, colors, _weights, chain_labels, columns, truths, n_dim, num_chains = (
-        _normalize_inputs(samples, None, None, None, None, False, None)
+    _chains, colors, _weights, periodic, chain_labels, columns, truths, n_dim, num_chains = (
+        _normalize_inputs(samples, None, None, None, None, None, False, None)
     )
     assert isinstance(_chains, list)
     assert len(_chains) == 1
@@ -43,8 +43,8 @@ def test_normalize_inputs_plot_delta_zeroes_truths():
     data2 = np.random.randn(100)
     samples = {"x": data, "y": data2}
     truths_in = {"x": 1.0, "y": 2.0}
-    _chains, colors, _weights, chain_labels, columns, truths, n_dim, num_chains = (
-        _normalize_inputs(samples, None, None, None, None, True, truths_in)
+    _chains, colors, _weights, periodic, chain_labels, columns, truths, n_dim, num_chains = (
+        _normalize_inputs(samples, None, None, None, None, None, True, truths_in)
     )
     assert all(v == 0.0 for v in truths.values())
     assert all("$" in k for k in truths.keys())
@@ -57,7 +57,7 @@ def test_normalize_inputs_mismatched_weights_raises():
     samples = [chain1, chain2]
     weights = [np.ones(50)]  # only 1 weight array for 2 chains
     with pytest.raises(ValueError, match="weight"):
-        _normalize_inputs(samples, weights, None, None, None, False, None)
+        _normalize_inputs(samples, weights, None, None, None, None, False, None)
 
 
 def test_resolve_plot_config_invalid_diag_mode_raises():
@@ -148,8 +148,8 @@ def _build_inputs():
     """Build valid inputs for _plot_diagonal and _plot_offdiagonal via pure helpers."""
     np.random.seed(42)
     samples = {"x": np.random.randn(200), "y": np.random.randn(200)}
-    _chains, colors, _weights, chain_labels, columns, truths, n_dim, num_chains = (
-        _normalize_inputs(samples, None, None, None, None, False, None)
+    _chains, colors, _weights, periodic, chain_labels, columns, truths, n_dim, num_chains = (
+        _normalize_inputs(samples, None, None, None, None, None, False, None)
     )
     (kde_kwargs, offdiag_kwargs, truth_kwargs, base_mode, overlay_mode,
      offdiag_hist_fn, _use_kde, kde_bw, kde_fast, kde_num_1d, kde_num_2d) = (
@@ -173,6 +173,7 @@ def test_plot_diagonal_runs_without_error():
         kde_bw=kde_bw, kde_fast=kde_fast, kde_num_1d=kde_num_1d, kde_kwargs=kde_kwargs,
         title_format=None, num_chains=num_chains, label_fontsize=10, tick_labelsize=8,
         all_left_limit=all_left_limit, all_right_limit=all_right_limit, xlabelpad=2.0,
+        diagonal_ticks=False,
     )
     assert len(axes[0, 0].get_lines()) > 0
     plt.close("all")
@@ -194,6 +195,7 @@ def test_plot_diagonal_hist_mode_does_not_call_kde_1d(monkeypatch):
         kde_bw=kde_bw, kde_fast=kde_fast, kde_num_1d=kde_num_1d, kde_kwargs=kde_kwargs,
         title_format=None, num_chains=num_chains, label_fontsize=10, tick_labelsize=8,
         all_left_limit=all_left_limit, all_right_limit=all_right_limit, xlabelpad=2.0,
+        diagonal_ticks=False,
     )
     plt.close("all")
 
@@ -209,6 +211,7 @@ def test_plot_offdiagonal_runs_without_error():
         overlay_mode=overlay_mode, kde_bw=kde_bw, kde_fast=kde_fast, kde_num_2d=kde_num_2d,
         contour_levels=[0.68, 0.95], offdiag_kwargs=offdiag_kwargs,
         label_fontsize=10, tick_labelsize=8, xlabelpad=2.0, ylabelpad=2.0,
+        diagonal_ticks=False,
     )
     assert len(axes[1, 0].get_lines()) > 0 or len(axes[1, 0].collections) > 0
     plt.close("all")
@@ -222,8 +225,8 @@ def test_normalize_inputs_ndarray_samples_auto_labels():
     # shape (N, n_params) array — columns should be auto-labelled θ_0, θ_1
     np.random.seed(42)
     data = np.random.randn(100, 2)
-    _chains, colors, _weights, chain_labels, columns, truths, n_dim, num_chains = (
-        _normalize_inputs(data, None, None, None, None, False, None)
+    _chains, colors, _weights, periodic, chain_labels, columns, truths, n_dim, num_chains = (
+        _normalize_inputs(data, None, None, None, None, None, False, None)
     )
     assert num_chains == 1
     assert n_dim == 2
@@ -238,8 +241,8 @@ def test_normalize_inputs_ndarray_truths_converted_to_dict():
     np.random.seed(42)
     samples = {"x": np.random.randn(100), "y": np.random.randn(100)}
     truths_arr = np.array([1.0, 2.0])
-    _chains, colors, _weights, chain_labels, columns, truths, n_dim, num_chains = (
-        _normalize_inputs(samples, None, None, None, ["x", "y"], False, truths_arr)
+    _chains, colors, _weights, periodic, chain_labels, columns, truths, n_dim, num_chains = (
+        _normalize_inputs(samples, None, None, None, None, ["x", "y"], False, truths_arr)
     )
     assert isinstance(truths, dict)
     assert truths == {"x": 1.0, "y": 2.0}
