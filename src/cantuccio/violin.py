@@ -134,6 +134,7 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
     fig: Optional[Figure] = None,
     axes: Optional[np.ndarray] = None,
     n_ticks: int = 4,
+    diagonal_ticks: bool = False,
     stylefile: str | None = None,
     savepath: str | None = None,
 ) -> tuple[Figure, np.ndarray]:
@@ -205,6 +206,8 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
         Array of matplotlib Axes objects of length ``n_dim``. If None, a new set of axes will be created.
     n_ticks : int, default 4
         Number of ticks to show on each x-axis.
+    diagonal_ticks : bool, default False
+        If True, the ticks on the x-axis will be tilted by 45 degrees for better readability.
     stylefile : str, optional
         Path to a Matplotlib style file to use for the plot. If None, a default style file included with the package will be used.
     savepath : str, optional
@@ -229,14 +232,14 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
     with plt.style.context(stylefile):
         user_columns = columns  # preserve original before normalization reassigns it
         user_truths = truths    # preserve original before normalization renames delta keys
-        (_chains, row_colors, _weights, chain_labels, columns, truths, n_dim, num_chains
-        ) = _normalize_inputs(samples, weights, row_colors, labels, user_columns, plot_delta, truths)
+        (_chains, row_colors, _weights, periodic, chain_labels, columns, truths, n_dim, num_chains
+        ) = _normalize_inputs(samples, weights, periodic, row_colors, labels, user_columns, plot_delta, truths)
 
         split = samples2 is not None
         _chains2 = _weights2_norm = None
         if split:
-            (_chains2, _, _weights2_norm, _, _, _, _, num_chains2
-            ) = _normalize_inputs(samples2, weights2, None, labels, user_columns, plot_delta, user_truths)
+            (_chains2, _, _weights2_norm, _, _, _, _, _, num_chains2
+            ) = _normalize_inputs(samples2, weights2, None, None, labels, user_columns, plot_delta, user_truths)
             if num_chains2 != num_chains:
                 raise ValueError(
                     f"samples2 must have the same number of rows (chains) as samples "
@@ -341,6 +344,8 @@ def violinplot(  # pylint: disable=too-many-branches too-many-statements too-man
                 ax.tick_params(labelleft=False)
             ax.tick_params(labelsize=tick_labelsize)
             ax.tick_params(axis="y", direction=plt.rcParams["xtick.direction"])
+            rotation_kwargs = {"labelrotation": 45, "labelrotation_mode": "xtick"} if diagonal_ticks else {}
+            ax.tick_params(axis="x", **rotation_kwargs)
 
         fig.align_labels()
         fig.tight_layout()

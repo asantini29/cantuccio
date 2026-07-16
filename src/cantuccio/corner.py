@@ -467,10 +467,10 @@ def _sync_axes(axes, n_dim, n_ticks) -> None:
 def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, offdiag_hist_fn,
                       _use_kde, base_mode, overlay_mode, kde_bw, kde_fast, kde_num_2d,
                       contour_levels, offdiag_kwargs, label_fontsize, tick_labelsize, xlabelpad,
-                      ylabelpad) -> None:
+                      ylabelpad, diagonal_ticks) -> None:
     for i in range(1, n_dim):
         for j in range(i):
-            ax = axes[i, j]
+            ax: plt.Axes = axes[i, j]
 
             for c_idx, (chain_here, color) in enumerate(zip(_chains, colors)):
                 xd = chain_here.get(columns[j])
@@ -532,7 +532,8 @@ def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic,
                 ax.set_xlabel(columns[j], fontsize=label_fontsize)
                 ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=True))
                 ax.xaxis.offsetText.set_fontsize(tick_labelsize)
-
+                rotation_kwargs = {"labelrotation": 45, "labelrotation_mode": "xtick"} if diagonal_ticks else {}
+                ax.tick_params(axis="x", **rotation_kwargs)
                 ax.xaxis.labelpad = xlabelpad
 
             else:
@@ -554,7 +555,7 @@ def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic,
 def _plot_diagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, diag_mode,
                    credible_interval, statistic, base_mode, kde_bw, kde_fast, kde_num_1d,
                    kde_kwargs, title_format, num_chains, label_fontsize, tick_labelsize,
-                   all_left_limit, all_right_limit, xlabelpad) -> None:
+                   all_left_limit, all_right_limit, xlabelpad, diagonal_ticks) -> None:
     for i in range(n_dim):
         ax = axes[i, i]
         for c_idx, (chain_here, color) in enumerate(zip(_chains, colors)):
@@ -667,6 +668,9 @@ def _plot_diagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, di
             ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=True))
             ax.xaxis.offsetText.set_fontsize(tick_labelsize)
 
+            rotation_kwargs = {"labelrotation": 45, "labelrotation_mode": "xtick"} if diagonal_ticks else {}
+            ax.tick_params(axis="x", **rotation_kwargs)
+
             ax.xaxis.labelpad = xlabelpad
 
         ax.tick_params(axis="x", labelsize=tick_labelsize)
@@ -762,12 +766,13 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
     truth_kwargs: Optional[dict] = None,
     legend_kwargs: Optional[dict] = None,
     n_ticks: int = 4,
-    xlabelpad: float | None = 4.0,
-    ylabelpad: float | None = 2.0,
+    diagonal_ticks: bool = False,
+    xlabelpad: Optional[float] = 4.0,
+    ylabelpad: Optional[float] = 2.0,
     hspace=0.1,
     wspace=0.1,
-    stylefile: str | None = None,
-    savepath: str | None = None,
+    stylefile: Optional[str] = None,
+    savepath: Optional[str] = None,
 ) -> tuple[Figure, np.ndarray]:
     """
     Custom corner plot with KDE marginals and 2D contours/hexbin/histograms.
@@ -843,6 +848,10 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         Keyword arguments for the legend.
     n_ticks : int, default 4
         Number of ticks to show on each axis.
+    ticks_format : str, optional
+        Format string for the tick labels. If None, the default Matplotlib formatting will be used.
+    diagonal_ticks : bool, default False
+        If True, the ticks on the x-axis will be tilted by 45 degrees for better readability.
     xlabelpad : float, optional
         Padding for x-axis labels. If None, the default Matplotlib padding will be used.
     ylabelpad : float, optional
@@ -863,8 +872,8 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         stylefile = get_stylefile()
 
     with plt.style.context(stylefile):
-        (_chains, colors, _weights, chain_labels, columns, truths, n_dim, num_chains
-        ) = _normalize_inputs(samples, weights, colors, labels, columns, plot_delta, truths)
+        (_chains, colors, _weights, periodic, chain_labels, columns, truths, n_dim, num_chains
+        ) = _normalize_inputs(samples, weights, periodic, colors, labels, columns, plot_delta, truths)
 
         # ── defaults ──────────────────────────────────────────────────────────────
         (kde_kwargs, offdiag_kwargs, truth_kwargs, base_mode, overlay_mode,
@@ -881,13 +890,13 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         _plot_diagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, diag_mode,
                        credible_interval, statistic, base_mode, kde_bw, kde_fast, kde_num_1d,
                        kde_kwargs, title_format, num_chains, label_fontsize, tick_labelsize,
-                       all_left_limit, all_right_limit, xlabelpad)
+                       all_left_limit, all_right_limit, xlabelpad, diagonal_ticks)
 
         # ── off-diagonal: configurable 2D density ─────────────────────────────────
         _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, offdiag_hist_fn,
                           _use_kde, base_mode, overlay_mode, kde_bw, kde_fast, kde_num_2d,
                           contour_levels, offdiag_kwargs, label_fontsize, tick_labelsize, xlabelpad,
-                          ylabelpad)
+                          ylabelpad, diagonal_ticks)
 
         # Now add truths to the diagonal and off-diagonal panels
         if truths is not None:

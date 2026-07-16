@@ -168,7 +168,7 @@ _CREDIBLE_INTERVAL_REGISTRY = {
 }
 
 
-def _normalize_inputs(samples, weights, colors, labels, columns, plot_delta, truths
+def _normalize_inputs(samples, weights, periodic, colors, labels, columns, plot_delta, truths
 ) -> tuple:
     chain_labels = labels  # give a more descriptive name
 
@@ -257,6 +257,9 @@ def _normalize_inputs(samples, weights, colors, labels, columns, plot_delta, tru
                 new_key = rf"$\Delta\,${key}"
 
             new_columns.append(new_key)
+            if periodic and key in periodic.keys():
+                periodic[new_key] = periodic[key]
+                periodic.pop(key)
 
         for chain in samples:
             tmp_chain = {}
@@ -274,4 +277,4 @@ def _normalize_inputs(samples, weights, colors, labels, columns, plot_delta, tru
                     tmp_chain[key] = chain[key]
             _chains.append(tmp_chain)
 
-    return (_chains, colors, _weights, chain_labels, columns, truths, n_dim, num_chains)
+    return (_chains, colors, _weights, periodic,chain_labels, columns, truths, n_dim, num_chains)
