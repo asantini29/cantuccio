@@ -14,6 +14,7 @@ from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 from scipy.stats import chi2
+from scipy.ndimage import gaussian_filter
 from matplotlib import pyplot as plt
 from matplotlib import ticker
 from matplotlib.colors import to_rgba
@@ -47,6 +48,9 @@ DIAG_MODES = {"kde", "hist"}
 
 ALPHA_CREDIBLE_INTERVAL = 0.5
 
+DEFAULT_HIST_CONTOUR_BINS = 20
+DEFAULT_HIST_CONTOUR_SMOOTH = 1.0
+
 
 def _hist_fn(ax, x, y, weights, cmap, **kwargs):
     ax.hist2d(
@@ -73,6 +77,33 @@ def _pass_fn(*args, **kwargs):
 
 def _hist_1d_fn(data, weights=None, bins=20, range=None):
     return np.histogram(data, bins=bins, range=range, weights=weights, density=True)
+
+
+def _hist_density_2d(
+    x, y, weights=None, bins=DEFAULT_HIST_CONTOUR_BINS, smooth=DEFAULT_HIST_CONTOUR_SMOOTH
+):
+    """Estimate a 2D density from an optionally smoothed histogram.
+
+    Returns ``(x_out, y_out, z_out)`` on a meshgrid, matching :func:`kde_2d`'s
+    orientation (``x_out``/``y_out`` of shape ``(bins, bins)`` from
+    :func:`numpy.meshgrid` of the bin centers, ``z_out = H.T``) so the same
+    contour-drawing code can consume either estimator. Used to draw contour
+    lines in the ``hist``/``hexbin`` off-diagonal modes, where no KDE runs.
+
+    ``smooth`` is the Gaussian sigma in bin units; ``smooth <= 0`` disables
+    smoothing. Periodicity is intentionally not handled here: the samples are
+    already wrapped into their domain upstream in ``_plot_offdiagonal``, and a
+    histogram (unlike a KDE kernel) deposits each sample in exactly one bin, so
+    there is no cross-boundary leakage to fold back.
+    """
+    H, xedges, yedges = np.histogram2d(x, y, bins=bins, weights=weights)
+    if smooth and smooth > 0:
+        H = gaussian_filter(H, smooth)
+    x_centers = 0.5 * (xedges[:-1] + xedges[1:])
+    y_centers = 0.5 * (yedges[:-1] + yedges[1:])
+    x_out, y_out = np.meshgrid(x_centers, y_centers)
+    z_out = H.T
+    return x_out, y_out, z_out
 
 
 def overplot_lines(
