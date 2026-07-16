@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+from matplotlib.contour import QuadContourSet
 
 from cantuccio import cornerplot, traceplot, violinplot
 
@@ -166,6 +167,20 @@ def test_violinplot_dict_walker_values_flatten():
     walker_chain = {"x": np.random.randn(50, 4), "y": np.random.randn(50, 4)}
     fig, axes = violinplot(walker_chain)
     assert axes.shape == (2,)
+
+
+# ── cornerplot contour/kde ────────────────────────────────────────────────────
+
+
+def _has_contour(ax):
+    return any(isinstance(c, QuadContourSet) for c in ax.collections)
+
+
+def test_cornerplot_contour_kde_still_draws_contours():
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    fig, axes = cornerplot(samples, offdiag_mode="contour+kde")
+    assert _has_contour(axes[1, 0])
 
 
 # ── violinplot split mode ─────────────────────────────────────────────────────

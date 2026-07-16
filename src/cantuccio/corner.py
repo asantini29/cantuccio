@@ -495,6 +495,37 @@ def _sync_axes(axes, n_dim, n_ticks) -> None:
             axes[i, col].set_ylim(xlim)
 
 
+def _draw_contours(
+    ax, x_out, y_out, z_out, color, contour_levels, filled, lines, offdiag_kwargs
+) -> None:
+    """Draw HDI contour bands and/or lines for a density grid.
+
+    ``filled`` draws the power-law-alpha ``contourf`` bands (the ``contour``
+    base mode); ``lines`` draws the ``contour`` outline. No-op when the grid has
+    no usable levels below its maximum. Consumes either a ``kde_2d`` grid or a
+    ``_hist_density_2d`` grid — the orientation is identical.
+    """
+    raw_lvls = hdi_levels(z_out, contour_levels)
+    lvls = np.unique(raw_lvls)
+    lvls = lvls[lvls < z_out.max()].tolist()
+    if len(lvls) == 0:
+        return
+
+    if filled:
+        r, g, b, _ = to_rgba(color)
+        # Power-law scaling: squaring the fraction gives 4:1 inner/outer ratio
+        band_colors = [
+            (r, g, b, ALPHA_CREDIBLE_INTERVAL * ((k + 1) / len(lvls)) ** 2)
+            for k in range(len(lvls))
+        ]
+        ax.contourf(x_out, y_out, z_out, levels=[*lvls, z_out.max()], colors=band_colors)
+
+    if lines:
+        ax.contour(
+            x_out, y_out, z_out, levels=lvls, **{"colors": [color], **offdiag_kwargs}
+        )
+
+
 def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, offdiag_hist_fn,
                       _use_kde, base_mode, overlay_mode, kde_bw, kde_fast, kde_num_2d,
                       contour_levels, offdiag_kwargs, label_fontsize, tick_labelsize, xlabelpad,
@@ -530,34 +561,12 @@ def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic,
                         xd, yd, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_2d_here,
                         periodic_x=periodic_x, periodic_y=periodic_y
                     )
-                    raw_lvls = hdi_levels(z_out, contour_levels)
-                    lvls = np.unique(raw_lvls)
-                    lvls = lvls[lvls < z_out.max()].tolist()
-
-                    if len(lvls) > 0:
-                        if base_mode == "contour":
-                            r, g, b, _ = to_rgba(color)
-                            # Power-law scaling: squaring the fraction gives 4:1 inner/outer ratio
-                            band_colors = [
-                                (r, g, b, ALPHA_CREDIBLE_INTERVAL * ((k + 1) / len(lvls)) ** 2)
-                                for k in range(len(lvls))
-                            ]
-                            ax.contourf(
-                                x_out,
-                                y_out,
-                                z_out,
-                                levels=[*lvls, z_out.max()],
-                                colors=band_colors,
-                            )
-
-                        if overlay_mode == "kde" or base_mode == "kde":
-                            ax.contour(
-                                x_out,
-                                y_out,
-                                z_out,
-                                levels=lvls,
-                                **{"colors": [color], **offdiag_kwargs},
-                            )
+                    _draw_contours(
+                        ax, x_out, y_out, z_out, color, contour_levels,
+                        filled=(base_mode == "contour"),
+                        lines=(overlay_mode == "kde" or base_mode == "kde"),
+                        offdiag_kwargs=offdiag_kwargs,
+                    )
 
             if i == n_dim - 1:
                 ax.set_xlabel(columns[j], fontsize=label_fontsize)
