@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 from matplotlib.contour import QuadContourSet
 
+import cantuccio.corner as cornerplot_mod
 from cantuccio import cornerplot, traceplot, violinplot
 
 
@@ -180,6 +181,54 @@ def test_cornerplot_contour_kde_still_draws_contours():
     np.random.seed(0)
     samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
     fig, axes = cornerplot(samples, offdiag_mode="contour+kde")
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hexbin_overlays_contours():
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    fig, axes = cornerplot(samples, offdiag_mode="hexbin")
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hist_overlays_contours():
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    fig, axes = cornerplot(samples, offdiag_mode="hist")
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hexbin_smooth_zero_runs():
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    # smooth must be popped from offdiag_kwargs before it reaches hexbin,
+    # otherwise hexbin raises on the unexpected keyword.
+    fig, axes = cornerplot(samples, offdiag_mode="hexbin", offdiag_kwargs={"smooth": 0})
+    assert axes.shape == (2, 2)
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hexbin_does_not_call_kde_2d(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("kde_2d must not be called for hexbin mode")
+
+    monkeypatch.setattr(cornerplot_mod, "kde_2d", fail_if_called)
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    fig, axes = cornerplot(samples, offdiag_mode="hexbin")
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hexbin_periodic_runs():
+    np.random.seed(0)
+    samples = {
+        "phi": np.random.uniform(0, 2 * np.pi, 500),
+        "y": np.random.randn(500),
+    }
+    fig, axes = cornerplot(
+        samples, offdiag_mode="hexbin", periodic={"phi": (0.0, 2 * np.pi)}
+    )
+    assert axes.shape == (2, 2)
     assert _has_contour(axes[1, 0])
 
 

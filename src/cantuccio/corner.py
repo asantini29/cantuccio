@@ -530,6 +530,7 @@ def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic,
                       _use_kde, base_mode, overlay_mode, kde_bw, kde_fast, kde_num_2d,
                       contour_levels, offdiag_kwargs, label_fontsize, tick_labelsize, xlabelpad,
                       ylabelpad, diagonal_ticks) -> None:
+    smooth = offdiag_kwargs.pop("smooth", DEFAULT_HIST_CONTOUR_SMOOTH)
     for i in range(1, n_dim):
         for j in range(i):
             ax: plt.Axes = axes[i, j]
@@ -566,6 +567,14 @@ def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic,
                         filled=(base_mode == "contour"),
                         lines=(overlay_mode == "kde" or base_mode == "kde"),
                         offdiag_kwargs=offdiag_kwargs,
+                    )
+                else:
+                    x_out, y_out, z_out = _hist_density_2d(
+                        xd_plot, yd_plot, weights=w, smooth=smooth
+                    )
+                    _draw_contours(
+                        ax, x_out, y_out, z_out, color, contour_levels,
+                        filled=False, lines=True, offdiag_kwargs=offdiag_kwargs,
                     )
 
             if i == n_dim - 1:
