@@ -860,8 +860,8 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         - "hist": Histograms
     offdiag_mode : str, default "hexbin+kde"
         Mode for the off-diagonal panels. Options are:
-        - "hist": 2D histogram
-        - "hexbin": Hexagonal binning
+        - "hist": 2D histogram, with contour lines overlaid (density estimated from a smoothed histogram, not a KDE)
+        - "hexbin": Hexagonal binning, with contour lines overlaid (density estimated from a smoothed histogram, not a KDE)
         - "contour": Filled contour plot of the KDE
         - "kde": Non-filled contour plot of the KDE
         - "hist+kde": 2D histogram with KDE contours overlaid
@@ -891,6 +891,7 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         - "num_2d": Number of points per dimension to evaluate the 2D KDE on. Default is 80.
     offdiag_kwargs : dict, optional
         Keyword arguments for the off-diagonal plots (histogram, hexbin, contour).
+        For the "hist" and "hexbin" modes, the special key "smooth" sets the Gaussian sigma (in histogram-bin units, default 1.0) used to smooth the 2D histogram before extracting the contour lines; set "smooth": 0 to disable smoothing. This key is consumed internally and is not forwarded to the underlying histogram/hexbin call.
     truth_kwargs : dict, optional
         Keyword arguments for the truth lines.
     legend_kwargs : dict, optional
