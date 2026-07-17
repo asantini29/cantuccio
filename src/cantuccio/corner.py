@@ -574,7 +574,7 @@ def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic,
                     )
                     _draw_contours(
                         ax, x_out, y_out, z_out, color, contour_levels,
-                        filled=False, lines=True, offdiag_kwargs=offdiag_kwargs,
+                        filled=False, lines=True, offdiag_kwargs={},
                     )
 
             if i == n_dim - 1:

@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pytest
 from matplotlib.contour import QuadContourSet
@@ -230,6 +232,23 @@ def test_cornerplot_hexbin_periodic_runs():
     )
     assert axes.shape == (2, 2)
     assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hist_contours_do_not_warn_on_base_kwargs():
+    # Base-render kwargs (e.g. gridsize/cmin) must not leak into ax.contour and
+    # trigger "kwargs not used by contour" warnings for the histogram path.
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        fig_hex, axes_hex = cornerplot(
+            samples, offdiag_mode="hexbin", offdiag_kwargs={"gridsize": 30}
+        )
+        fig_hist, axes_hist = cornerplot(
+            samples, offdiag_mode="hist", offdiag_kwargs={"cmin": 1}
+        )
+    assert _has_contour(axes_hex[1, 0])
+    assert _has_contour(axes_hist[1, 0])
 
 
 # ── violinplot split mode ─────────────────────────────────────────────────────
