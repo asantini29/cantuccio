@@ -898,8 +898,6 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         Keyword arguments for the legend.
     n_ticks : int, default 4
         Number of ticks to show on each axis.
-    ticks_format : str, optional
-        Format string for the tick labels. If None, the default Matplotlib formatting will be used.
     diagonal_ticks : bool, default False
         If True, the ticks on the x-axis will be tilted by 45 degrees for better readability.
     xlabelpad : float, optional
