@@ -127,3 +127,55 @@ def test_kde_2d_periodic_output_shape():
     assert np.isclose(X[0, -1], 2 * np.pi)
     assert np.isclose(Y[0, 0], 0.0)
     assert np.isclose(Y[-1, 0], 2 * np.pi)
+
+
+# ---------------------------------------------------------------------------
+# Histogram-based density estimator (Task 1)
+# ---------------------------------------------------------------------------
+
+from cantuccio.corner import _hist_density_2d
+
+
+def test_hist_density_2d_shapes_and_orientation():
+    np.random.seed(0)
+    x = np.random.randn(2000)
+    y = np.random.randn(2000)
+    x_out, y_out, z_out = _hist_density_2d(x, y, bins=20, smooth=0)
+    assert x_out.shape == y_out.shape == z_out.shape == (20, 20)
+    assert np.all(z_out >= 0)
+    # Standard-normal samples peak at the origin, i.e. the central bins.
+    iy, ix = np.unravel_index(np.argmax(z_out), z_out.shape)
+    assert 6 <= ix <= 13
+    assert 6 <= iy <= 13
+
+
+def test_hist_density_2d_weights_shift_mass():
+    x = np.array([0.0, 0.0, 10.0, 10.0])
+    y = np.array([0.0, 0.0, 10.0, 10.0])
+    w = np.array([1.0, 1.0, 100.0, 100.0])
+    _, _, z_out = _hist_density_2d(x, y, bins=10, smooth=0, weights=w)
+    iy, ix = np.unravel_index(np.argmax(z_out), z_out.shape)
+    # The heavily weighted corner is at max-x / max-y -> last bins.
+    assert ix >= 7
+    assert iy >= 7
+
+
+def test_hist_density_2d_smooth_zero_matches_raw_histogram():
+    np.random.seed(2)
+    x = np.random.randn(300)
+    y = np.random.randn(300)
+    H, _, _ = np.histogram2d(x, y, bins=20)
+    _, _, z_out = _hist_density_2d(x, y, bins=20, smooth=0)
+    assert np.array_equal(z_out, H.T)
+
+
+def test_hist_density_2d_smoothing_spreads_peak():
+    np.random.seed(1)
+    x = np.random.randn(500)
+    y = np.random.randn(500)
+    _, _, z_raw = _hist_density_2d(x, y, bins=20, smooth=0)
+    _, _, z_smooth = _hist_density_2d(x, y, bins=20, smooth=1.5)
+    assert z_raw.shape == z_smooth.shape
+    assert not np.allclose(z_raw, z_smooth)
+    # Smoothing a peaky histogram lowers its maximum.
+    assert z_smooth.max() < z_raw.max()

@@ -1,6 +1,10 @@
+import warnings
+
 import numpy as np
 import pytest
+from matplotlib.contour import QuadContourSet
 
+import cantuccio.corner as cornerplot_mod
 from cantuccio import cornerplot, traceplot, violinplot
 
 
@@ -166,6 +170,85 @@ def test_violinplot_dict_walker_values_flatten():
     walker_chain = {"x": np.random.randn(50, 4), "y": np.random.randn(50, 4)}
     fig, axes = violinplot(walker_chain)
     assert axes.shape == (2,)
+
+
+# ── cornerplot contour/kde ────────────────────────────────────────────────────
+
+
+def _has_contour(ax):
+    return any(isinstance(c, QuadContourSet) for c in ax.collections)
+
+
+def test_cornerplot_contour_kde_still_draws_contours():
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    fig, axes = cornerplot(samples, offdiag_mode="contour+kde")
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hexbin_overlays_contours():
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    fig, axes = cornerplot(samples, offdiag_mode="hexbin")
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hist_overlays_contours():
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    fig, axes = cornerplot(samples, offdiag_mode="hist")
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hexbin_smooth_zero_runs():
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    # smooth must be popped from offdiag_kwargs before it reaches hexbin,
+    # otherwise hexbin raises on the unexpected keyword.
+    fig, axes = cornerplot(samples, offdiag_mode="hexbin", offdiag_kwargs={"smooth": 0})
+    assert axes.shape == (2, 2)
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hexbin_does_not_call_kde_2d(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("kde_2d must not be called for hexbin mode")
+
+    monkeypatch.setattr(cornerplot_mod, "kde_2d", fail_if_called)
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    fig, axes = cornerplot(samples, offdiag_mode="hexbin")
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hexbin_periodic_runs():
+    np.random.seed(0)
+    samples = {
+        "phi": np.random.uniform(0, 2 * np.pi, 500),
+        "y": np.random.randn(500),
+    }
+    fig, axes = cornerplot(
+        samples, offdiag_mode="hexbin", periodic={"phi": (0.0, 2 * np.pi)}
+    )
+    assert axes.shape == (2, 2)
+    assert _has_contour(axes[1, 0])
+
+
+def test_cornerplot_hist_contours_do_not_warn_on_base_kwargs():
+    # Base-render kwargs (e.g. gridsize/cmin) must not leak into ax.contour and
+    # trigger "kwargs not used by contour" warnings for the histogram path.
+    np.random.seed(0)
+    samples = {"x": np.random.randn(500), "y": np.random.randn(500)}
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", UserWarning)
+        fig_hex, axes_hex = cornerplot(
+            samples, offdiag_mode="hexbin", offdiag_kwargs={"gridsize": 30}
+        )
+        fig_hist, axes_hist = cornerplot(
+            samples, offdiag_mode="hist", offdiag_kwargs={"cmin": 1}
+        )
+    assert _has_contour(axes_hex[1, 0])
+    assert _has_contour(axes_hist[1, 0])
 
 
 # ── violinplot split mode ─────────────────────────────────────────────────────

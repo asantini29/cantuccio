@@ -14,6 +14,7 @@ from typing import Optional, TYPE_CHECKING
 
 import numpy as np
 from scipy.stats import chi2
+from scipy.ndimage import gaussian_filter
 from matplotlib import pyplot as plt
 from matplotlib import ticker
 from matplotlib.colors import to_rgba
@@ -47,6 +48,9 @@ DIAG_MODES = {"kde", "hist"}
 
 ALPHA_CREDIBLE_INTERVAL = 0.5
 
+DEFAULT_HIST_CONTOUR_BINS = 20
+DEFAULT_HIST_CONTOUR_SMOOTH = 1.0
+
 
 def _hist_fn(ax, x, y, weights, cmap, **kwargs):
     ax.hist2d(
@@ -73,6 +77,33 @@ def _pass_fn(*args, **kwargs):
 
 def _hist_1d_fn(data, weights=None, bins=20, range=None):
     return np.histogram(data, bins=bins, range=range, weights=weights, density=True)
+
+
+def _hist_density_2d(
+    x, y, weights=None, bins=DEFAULT_HIST_CONTOUR_BINS, smooth=DEFAULT_HIST_CONTOUR_SMOOTH
+):
+    """Estimate a 2D density from an optionally smoothed histogram.
+
+    Returns ``(x_out, y_out, z_out)`` on a meshgrid, matching :func:`kde_2d`'s
+    orientation (``x_out``/``y_out`` of shape ``(bins, bins)`` from
+    :func:`numpy.meshgrid` of the bin centers, ``z_out = H.T``) so the same
+    contour-drawing code can consume either estimator. Used to draw contour
+    lines in the ``hist``/``hexbin`` off-diagonal modes, where no KDE runs.
+
+    ``smooth`` is the Gaussian sigma in bin units; ``smooth <= 0`` disables
+    smoothing. Periodicity is intentionally not handled here: the samples are
+    already wrapped into their domain upstream in ``_plot_offdiagonal``, and a
+    histogram (unlike a KDE kernel) deposits each sample in exactly one bin, so
+    there is no cross-boundary leakage to fold back.
+    """
+    H, xedges, yedges = np.histogram2d(x, y, bins=bins, weights=weights)
+    if smooth and smooth > 0:
+        H = gaussian_filter(H, smooth)
+    x_centers = 0.5 * (xedges[:-1] + xedges[1:])
+    y_centers = 0.5 * (yedges[:-1] + yedges[1:])
+    x_out, y_out = np.meshgrid(x_centers, y_centers)
+    z_out = H.T
+    return x_out, y_out, z_out
 
 
 def overplot_lines(
@@ -464,13 +495,45 @@ def _sync_axes(axes, n_dim, n_ticks) -> None:
             axes[i, col].set_ylim(xlim)
 
 
+def _draw_contours(
+    ax, x_out, y_out, z_out, color, contour_levels, filled, lines, offdiag_kwargs
+) -> None:
+    """Draw HDI contour bands and/or lines for a density grid.
+
+    ``filled`` draws the power-law-alpha ``contourf`` bands (the ``contour``
+    base mode); ``lines`` draws the ``contour`` outline. No-op when the grid has
+    no usable levels below its maximum. Consumes either a ``kde_2d`` grid or a
+    ``_hist_density_2d`` grid — the orientation is identical.
+    """
+    raw_lvls = hdi_levels(z_out, contour_levels)
+    lvls = np.unique(raw_lvls)
+    lvls = lvls[lvls < z_out.max()].tolist()
+    if len(lvls) == 0:
+        return
+
+    if filled:
+        r, g, b, _ = to_rgba(color)
+        # Power-law scaling: squaring the fraction gives 4:1 inner/outer ratio
+        band_colors = [
+            (r, g, b, ALPHA_CREDIBLE_INTERVAL * ((k + 1) / len(lvls)) ** 2)
+            for k in range(len(lvls))
+        ]
+        ax.contourf(x_out, y_out, z_out, levels=[*lvls, z_out.max()], colors=band_colors)
+
+    if lines:
+        ax.contour(
+            x_out, y_out, z_out, levels=lvls, **{"colors": [color], **offdiag_kwargs}
+        )
+
+
 def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, offdiag_hist_fn,
                       _use_kde, base_mode, overlay_mode, kde_bw, kde_fast, kde_num_2d,
                       contour_levels, offdiag_kwargs, label_fontsize, tick_labelsize, xlabelpad,
-                      ylabelpad) -> None:
+                      ylabelpad, diagonal_ticks) -> None:
+    smooth = offdiag_kwargs.pop("smooth", DEFAULT_HIST_CONTOUR_SMOOTH)
     for i in range(1, n_dim):
         for j in range(i):
-            ax = axes[i, j]
+            ax: plt.Axes = axes[i, j]
 
             for c_idx, (chain_here, color) in enumerate(zip(_chains, colors)):
                 xd = chain_here.get(columns[j])
@@ -499,40 +562,27 @@ def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic,
                         xd, yd, bw=kde_bw, weights=w, fast=kde_fast, n=kde_num_2d_here,
                         periodic_x=periodic_x, periodic_y=periodic_y
                     )
-                    raw_lvls = hdi_levels(z_out, contour_levels)
-                    lvls = np.unique(raw_lvls)
-                    lvls = lvls[lvls < z_out.max()].tolist()
-
-                    if len(lvls) > 0:
-                        if base_mode == "contour":
-                            r, g, b, _ = to_rgba(color)
-                            # Power-law scaling: squaring the fraction gives 4:1 inner/outer ratio
-                            band_colors = [
-                                (r, g, b, ALPHA_CREDIBLE_INTERVAL * ((k + 1) / len(lvls)) ** 2)
-                                for k in range(len(lvls))
-                            ]
-                            ax.contourf(
-                                x_out,
-                                y_out,
-                                z_out,
-                                levels=[*lvls, z_out.max()],
-                                colors=band_colors,
-                            )
-
-                        if overlay_mode == "kde" or base_mode == "kde":
-                            ax.contour(
-                                x_out,
-                                y_out,
-                                z_out,
-                                levels=lvls,
-                                **{"colors": [color], **offdiag_kwargs},
-                            )
+                    _draw_contours(
+                        ax, x_out, y_out, z_out, color, contour_levels,
+                        filled=(base_mode == "contour"),
+                        lines=(overlay_mode == "kde" or base_mode == "kde"),
+                        offdiag_kwargs=offdiag_kwargs,
+                    )
+                else:
+                    x_out, y_out, z_out = _hist_density_2d(
+                        xd_plot, yd_plot, weights=w, smooth=smooth
+                    )
+                    _draw_contours(
+                        ax, x_out, y_out, z_out, color, contour_levels,
+                        filled=False, lines=True, offdiag_kwargs={},
+                    )
 
             if i == n_dim - 1:
                 ax.set_xlabel(columns[j], fontsize=label_fontsize)
                 ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=True))
                 ax.xaxis.offsetText.set_fontsize(tick_labelsize)
-
+                rotation_kwargs = {"labelrotation": 45, "labelrotation_mode": "xtick"} if diagonal_ticks else {}
+                ax.tick_params(axis="x", **rotation_kwargs)
                 ax.xaxis.labelpad = xlabelpad
 
             else:
@@ -554,7 +604,7 @@ def _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic,
 def _plot_diagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, diag_mode,
                    credible_interval, statistic, base_mode, kde_bw, kde_fast, kde_num_1d,
                    kde_kwargs, title_format, num_chains, label_fontsize, tick_labelsize,
-                   all_left_limit, all_right_limit, xlabelpad) -> None:
+                   all_left_limit, all_right_limit, xlabelpad, diagonal_ticks) -> None:
     for i in range(n_dim):
         ax = axes[i, i]
         for c_idx, (chain_here, color) in enumerate(zip(_chains, colors)):
@@ -667,6 +717,9 @@ def _plot_diagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, di
             ax.xaxis.set_major_formatter(ticker.ScalarFormatter(useOffset=True))
             ax.xaxis.offsetText.set_fontsize(tick_labelsize)
 
+            rotation_kwargs = {"labelrotation": 45, "labelrotation_mode": "xtick"} if diagonal_ticks else {}
+            ax.tick_params(axis="x", **rotation_kwargs)
+
             ax.xaxis.labelpad = xlabelpad
 
         ax.tick_params(axis="x", labelsize=tick_labelsize)
@@ -762,12 +815,13 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
     truth_kwargs: Optional[dict] = None,
     legend_kwargs: Optional[dict] = None,
     n_ticks: int = 4,
-    xlabelpad: float | None = 4.0,
-    ylabelpad: float | None = 2.0,
+    diagonal_ticks: bool = False,
+    xlabelpad: Optional[float] = 4.0,
+    ylabelpad: Optional[float] = 2.0,
     hspace=0.1,
     wspace=0.1,
-    stylefile: str | None = None,
-    savepath: str | None = None,
+    stylefile: Optional[str] = None,
+    savepath: Optional[str] = None,
 ) -> tuple[Figure, np.ndarray]:
     """
     Custom corner plot with KDE marginals and 2D contours/hexbin/histograms.
@@ -806,8 +860,8 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         - "hist": Histograms
     offdiag_mode : str, default "hexbin+kde"
         Mode for the off-diagonal panels. Options are:
-        - "hist": 2D histogram
-        - "hexbin": Hexagonal binning
+        - "hist": 2D histogram, with contour lines overlaid (density estimated from a smoothed histogram, not a KDE)
+        - "hexbin": Hexagonal binning, with contour lines overlaid (density estimated from a smoothed histogram, not a KDE)
         - "contour": Filled contour plot of the KDE
         - "kde": Non-filled contour plot of the KDE
         - "hist+kde": 2D histogram with KDE contours overlaid
@@ -837,12 +891,15 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         - "num_2d": Number of points per dimension to evaluate the 2D KDE on. Default is 80.
     offdiag_kwargs : dict, optional
         Keyword arguments for the off-diagonal plots (histogram, hexbin, contour).
+        For the "hist" and "hexbin" modes, the special key "smooth" sets the Gaussian sigma (in histogram-bin units, default 1.0) used to smooth the 2D histogram before extracting the contour lines; set "smooth": 0 to disable smoothing. This key is consumed internally and is not forwarded to the underlying histogram/hexbin call.
     truth_kwargs : dict, optional
         Keyword arguments for the truth lines.
     legend_kwargs : dict, optional
         Keyword arguments for the legend.
     n_ticks : int, default 4
         Number of ticks to show on each axis.
+    diagonal_ticks : bool, default False
+        If True, the ticks on the x-axis will be tilted by 45 degrees for better readability.
     xlabelpad : float, optional
         Padding for x-axis labels. If None, the default Matplotlib padding will be used.
     ylabelpad : float, optional
@@ -863,8 +920,8 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         stylefile = get_stylefile()
 
     with plt.style.context(stylefile):
-        (_chains, colors, _weights, chain_labels, columns, truths, n_dim, num_chains
-        ) = _normalize_inputs(samples, weights, colors, labels, columns, plot_delta, truths)
+        (_chains, colors, _weights, periodic, chain_labels, columns, truths, n_dim, num_chains
+        ) = _normalize_inputs(samples, weights, periodic, colors, labels, columns, plot_delta, truths)
 
         # ── defaults ──────────────────────────────────────────────────────────────
         (kde_kwargs, offdiag_kwargs, truth_kwargs, base_mode, overlay_mode,
@@ -881,13 +938,13 @@ def cornerplot(  # pylint: disable=too-many-branches, too-many-statements too-ma
         _plot_diagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, diag_mode,
                        credible_interval, statistic, base_mode, kde_bw, kde_fast, kde_num_1d,
                        kde_kwargs, title_format, num_chains, label_fontsize, tick_labelsize,
-                       all_left_limit, all_right_limit, xlabelpad)
+                       all_left_limit, all_right_limit, xlabelpad, diagonal_ticks)
 
         # ── off-diagonal: configurable 2D density ─────────────────────────────────
         _plot_offdiagonal(axes, _chains, colors, _weights, columns, n_dim, periodic, offdiag_hist_fn,
                           _use_kde, base_mode, overlay_mode, kde_bw, kde_fast, kde_num_2d,
                           contour_levels, offdiag_kwargs, label_fontsize, tick_labelsize, xlabelpad,
-                          ylabelpad)
+                          ylabelpad, diagonal_ticks)
 
         # Now add truths to the diagonal and off-diagonal panels
         if truths is not None:
